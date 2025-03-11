@@ -1,0 +1,16 @@
+{
+  "name": "img2ui-1",
+  "version": "1.0.0",
+  "description": "## Overview A modern web application built with Tailwind CSS and DaisyUI, focusing on AI-powered voice-to-text functionality.",
+  "main": "tailwind.config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "daisyui": "^5.0.0",
+    "tailwindcss": "^4.0.12"
+  }
+}
