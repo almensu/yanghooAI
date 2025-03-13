@@ -1,0 +1,87 @@
+.videoCard {
+  margin-bottom: 16px;
+  background-color: #FFFFFF;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all 0.3s;
+  box-shadow: 0px 4px 4px 0px rgba(0, 0, 0, 0.15);
+  width: 255px;
+  
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.thumbnailContainer {
+  position: relative;
+  height: 145px;
+  overflow: hidden;
+  background-color: #D9D9D9;
+  border-radius: 10px 10px 0px 0px;
+}
+
+.thumbnail {
+  width: 100%;
+  height: 100%;
+  background-color: #D9D9D9;
+}
+
+.thumbnailOverlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+}
+
+.sourceButton {
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 0 8px;
+  height: 28px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+  }
+}
+
+.content {
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.timeInfo {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.time, .timestamp {
+  color: #A7A7A7;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.title {
+  margin-bottom: 6px !important;
+  font-size: 20px;
+  font-weight: 500;
+  color: #000000;
+}
+
+.description {
+  color: #A7A7A7;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 0 !important;
+  line-height: 1.2;
+} 

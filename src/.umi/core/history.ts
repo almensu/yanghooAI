@@ -1,0 +1,21 @@
+// @ts-nocheck
+import { createBrowserHistory, History } from '/Volumes/2T/com/yanghoo205/img2ui-ant.design/node_modules/@umijs/runtime';
+
+let options = {
+  "basename": "/"
+};
+if ((<any>window).routerBase) {
+  options.basename = (<any>window).routerBase;
+}
+
+// remove initial history because of ssr
+let history: History = process.env.__IS_SERVER ? null : createBrowserHistory(options);
+export const createHistory = (hotReload = false) => {
+  if (!hotReload) {
+    history = createBrowserHistory(options);
+  }
+
+  return history;
+};
+
+export { history };

@@ -1,0 +1,77 @@
+.appContainer {
+  display: flex;
+  min-height: 100vh;
+}
+
+.sider {
+  background-color: #F9F9F9;
+  overflow-y: auto;
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 215px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  z-index: 10;
+}
+
+.topSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.bottomSection {
+  margin-top: auto;
+}
+
+.logo {
+  height: 48px;
+  line-height: 48px;
+  padding-left: 24px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #FFFFFF;
+  background-color: #414ABD;
+  border-radius: 4px;
+  margin: 8px;
+}
+
+.topMenu, .bottomMenu {
+  border-right: 0;
+  
+  :global {
+    .ant-menu-item {
+      height: 32px;
+      line-height: 32px;
+      margin: 4px 8px;
+      padding: 0 16px;
+      border-radius: 4px;
+      background-color: #F3F3F3;
+      font-size: 12px;
+      
+      &.ant-menu-item-selected {
+        background-color: #F3F3F3;
+        color: #000000;
+        font-weight: 400;
+      }
+    }
+  }
+}
+
+.topMenu {
+  margin-top: 8px;
+}
+
+.bottomMenu {
+  margin-bottom: 16px;
+}
+
+.mainContent {
+  margin-left: 215px;
+  padding: 32px 0;
+  background-color: #ffffff;
+  flex: 1;
+} 

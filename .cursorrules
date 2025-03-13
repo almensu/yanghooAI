@@ -1,0 +1,59 @@
+{
+  "projectType": "fullstack",
+  "frontend": {
+    "framework": "react",
+    "buildTool": "umijs",
+    "uiLibrary": "ant.design",
+    "uiVersion": "4.24.8",
+    "preferredLanguage": "typescript"
+  },
+  "backend": {
+    "language": "python",
+    "preferredFrameworks": ["fastapi", "flask", "django"]
+  },
+  "database": {
+    "type": "PostgreSQL",
+    "orm": "sqlalchemy"
+  },
+  "styling": {
+    "cssPreprocessor": "less",
+    "preferredApproach": "css-in-js"
+  },
+  "packageManager": "npm",
+  "conventions": {
+    "componentStyle": "functional",
+    "pythonStyle": "pep8",
+    "imports": {
+      "react": "import React from 'react'",
+      "antd": "import { Component } from 'antd'",
+      "umi": "import { useModel } from 'umi'"
+    },
+    "changelog": {
+      "path": "docs/changes",
+      "format": "{000}-{commit}.md",
+      "template": {
+        "title": "# [{number}] {title}",
+        "sections": [
+          "Date: YYYY-MM-DD",
+          "## Changes",
+          "## Related Files Changed",
+          "## Dependencies Updated"
+        ]
+      }
+    }
+  },
+  "testing": {
+    "frontend": "@umijs/test",
+    "backend": "pytest"
+  },
+  "dev": {
+    "port": 8000,
+    "proxy": {
+      "/api": "http://localhost:8000"
+    }
+  },
+  "environment": {
+    "node": "16.20.2",
+    "npm": ">=6.0.0"
+  }
+} 
