@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { createBrowserHistory, History } from '/Volumes/2T/com/yanghoo205/img2ui-ant.design/node_modules/@umijs/runtime';
+import { createBrowserHistory, History } from '/Volumes/2T/com/yanghoo205/img2ui-ant.design/frontend/node_modules/@umijs/runtime';
 
 let options = {
   "basename": "/"

@@ -4,8 +4,8 @@ import '@@/core/devScripts';
 import { plugin } from './core/plugin';
 import './core/pluginRegister';
 import { createHistory } from './core/history';
-import { ApplyPluginsType } from '/Volumes/2T/com/yanghoo205/img2ui-ant.design/node_modules/@umijs/runtime';
-import { renderClient } from '/Volumes/2T/com/yanghoo205/img2ui-ant.design/node_modules/@umijs/renderer-react/dist/index.js';
+import { ApplyPluginsType } from '/Volumes/2T/com/yanghoo205/img2ui-ant.design/frontend/node_modules/@umijs/runtime';
+import { renderClient } from '/Volumes/2T/com/yanghoo205/img2ui-ant.design/frontend/node_modules/@umijs/renderer-react/dist/index.js';
 import { getRoutes } from './core/routes';
 
 

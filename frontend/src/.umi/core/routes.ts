@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from 'react';
-import { ApplyPluginsType } from '/Volumes/2T/com/yanghoo205/img2ui-ant.design/node_modules/@umijs/runtime';
+import { ApplyPluginsType } from '/Volumes/2T/com/yanghoo205/img2ui-ant.design/frontend/node_modules/@umijs/runtime';
 import * as umiExports from './umiExports';
 import { plugin } from './plugin';
 
@@ -13,6 +13,16 @@ export function getRoutes() {
       {
         "path": "/",
         "component": require('@/pages/Home').default,
+        "exact": true
+      },
+      {
+        "path": "/video-data",
+        "component": require('@/pages/VideoData').default,
+        "exact": true
+      },
+      {
+        "path": "/video/:hash_name",
+        "component": require('@/pages/VideoPlayer').default,
         "exact": true
       }
     ]

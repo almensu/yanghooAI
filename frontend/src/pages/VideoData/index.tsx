@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Typography, Card, Spin, Alert, Button, Space, Input, Popconfirm, message, Tooltip, Modal, Image } from 'antd';
+
 import { ReloadOutlined, DatabaseOutlined, SearchOutlined, EyeOutlined, DeleteOutlined, FileImageOutlined } from '@ant-design/icons';
 import { getVideoData, deleteVideo } from '@/services/video';
 import styles from './index.less';

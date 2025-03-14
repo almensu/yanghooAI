@@ -125,6 +125,7 @@ const HomePage: React.FC = () => {
                 timestamp={video.timestamp}
                 source={video.source}
                 thumbnail={video.thumbnail}
+                hash_name={video.hash_name}
                 onDelete={() => handleDelete(video.id, video.hash_name)}
               />
             </Col>
@@ -158,13 +159,6 @@ const HomePage: React.FC = () => {
             style={{ marginLeft: 8 }}
           />
         </div>
-        
-        <Alert
-          message="支持 YouTube、Podcast 链接"
-          type="info"
-          className={styles.supportAlert}
-          showIcon={false}
-        />
       </div>
       
       <div className={styles.videoGrid}>

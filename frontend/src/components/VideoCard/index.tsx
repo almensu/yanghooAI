@@ -1,6 +1,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { Card, Typography, Image, message } from 'antd';
 import { DeleteOutlined, PlayCircleOutlined, FileImageOutlined } from '@ant-design/icons';
+import { useHistory } from 'umi';
 import styles from './index.less';
 
 const { Title, Paragraph, Text } = Typography;
@@ -22,6 +23,7 @@ interface VideoCardProps {
   time: string;
   timestamp: string;
   source: string;
+  hash_name?: string;
   onDelete?: () => void;
 }
 
@@ -32,12 +34,14 @@ const VideoCard: React.FC<VideoCardProps> = ({
   time,
   timestamp,
   source,
+  hash_name,
   onDelete,
 }) => {
   // 为每个卡片生成一个随机背景色
   const backgroundColor = useMemo(() => getRandomColor(), []);
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const history = useHistory();
   
   // 调试缩略图
   useEffect(() => {
@@ -82,6 +86,13 @@ const VideoCard: React.FC<VideoCardProps> = ({
   // 添加状态来存储修正后的缩略图URL
   const [fixedThumbnailUrl, setFixedThumbnailUrl] = useState<string | undefined>(undefined);
   
+  // 处理卡片点击事件
+  const handleCardClick = () => {
+    if (hash_name) {
+      history.push(`/video/${hash_name}`);
+    }
+  };
+  
   // 使用 Ant Design 的 Image 组件
   const renderThumbnail = () => {
     // 使用修正后的URL或原始URL
@@ -117,7 +128,12 @@ const VideoCard: React.FC<VideoCardProps> = ({
   };
   
   return (
-    <Card className={styles.videoCard} bordered={false}>
+    <Card 
+      className={styles.videoCard} 
+      bordered={false}
+      onClick={handleCardClick}
+      style={{ cursor: hash_name ? 'pointer' : 'default' }}
+    >
       <div className={styles.thumbnailContainer}>
         <div className={styles.thumbnailOverlay}>
           <div className={styles.sourceButton}>
@@ -126,7 +142,13 @@ const VideoCard: React.FC<VideoCardProps> = ({
           </div>
         </div>
         {onDelete && (
-          <div className={styles.deleteButton} onClick={onDelete}>
+          <div 
+            className={styles.deleteButton} 
+            onClick={(e) => {
+              e.stopPropagation(); // 阻止事件冒泡
+              onDelete();
+            }}
+          >
             <DeleteOutlined />
           </div>
         )}

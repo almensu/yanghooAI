@@ -13,6 +13,7 @@ export default defineConfig({
       routes: [
         { path: '/', component: '@/pages/Home' },
         { path: '/video-data', component: '@/pages/VideoData' },
+        { path: '/video/:hash_name', component: '@/pages/VideoPlayer' },
       ],
     },
   ],

@@ -316,4 +316,17 @@ export const getVideoDataForHome = async (): Promise<VideoDisplay[]> => {
     console.error('获取视频数据时出错:', error);
     return [];
   }
-}; 
+};
+
+/**
+ * 获取单个视频详情
+ */
+export async function getVideoByHash(hash_name: string): Promise<Video | null> {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/video/${hash_name}`);
+    return response.data;
+  } catch (error) {
+    console.error('获取视频详情失败:', error);
+    return null;
+  }
+} 

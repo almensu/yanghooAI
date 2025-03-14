@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React from 'react';
-import initialState from '/Volumes/2T/com/yanghoo205/img2ui-ant.design/src/.umi/plugin-initial-state/models/initialState';
+import initialState from '/Volumes/2T/com/yanghoo205/img2ui-ant.design/frontend/src/.umi/plugin-initial-state/models/initialState';
 
 // @ts-ignore
 import Dispatcher from './helpers/dispatcher';
