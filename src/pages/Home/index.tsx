@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Row, Col, Alert, Spin } from 'antd';
+import { Typography, Row, Col, Alert, Spin, message } from 'antd';
 import VideoCard from '@/components/VideoCard';
 import { getVideos, Video } from '@/services/video';
 import styles from './index.less';
@@ -24,6 +24,11 @@ const HomePage: React.FC = () => {
 
     fetchVideos();
   }, []);
+
+  const handleDelete = (id: string) => {
+    setVideos(videos.filter(video => video.id !== id));
+    message.success('视频已删除');
+  };
 
   return (
     <div className={styles.homePage}>
@@ -55,6 +60,7 @@ const HomePage: React.FC = () => {
               timestamp={video.timestamp}
               source={video.source}
               thumbnail={video.thumbnail}
+              onDelete={() => handleDelete(video.id)}
             />
           ))
         )}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, Typography } from 'antd';
+import { DeleteOutlined } from '@ant-design/icons';
 import styles from './index.less';
 
 const { Title, Paragraph, Text } = Typography;
@@ -11,6 +12,7 @@ interface VideoCardProps {
   time: string;
   timestamp: string;
   source: string;
+  onDelete?: () => void;
 }
 
 const VideoCard: React.FC<VideoCardProps> = ({
@@ -20,6 +22,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
   time,
   timestamp,
   source,
+  onDelete,
 }) => {
   return (
     <Card className={styles.videoCard} bordered={false}>
@@ -29,6 +32,9 @@ const VideoCard: React.FC<VideoCardProps> = ({
             <span>来自</span>
             <span>{source}</span>
           </div>
+        </div>
+        <div className={styles.deleteButton} onClick={onDelete}>
+          <DeleteOutlined />
         </div>
         <div className={styles.thumbnail} style={{ backgroundColor: '#D9D9D9' }} />
       </div>
