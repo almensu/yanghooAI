@@ -40,6 +40,17 @@ interface VideoData {
   subtitle_zh_cn_json_path?: string;
   subtitle_zh_cn_ass_path?: string;
   folder_hash_name_path?: string;
+  files?: {
+    subtitles?: {
+      en_json?: string;
+      zh_json?: string;
+      en_ass?: string;
+      zh_ass?: string;
+      ass?: string;
+      en_md?: string;
+      zh_md?: string;
+    };
+  };
   [key: string]: any;
 }
 
@@ -270,36 +281,150 @@ const VideoDataPage: React.FC = () => {
     {
       title: '字幕文件',
       key: 'subtitles',
-      width: 150,
+      width: 200,
       render: (_: any, record: VideoData) => {
-        const enSubtitle = record.subtitle_en_json_path || record.subtitle_en_ass_path;
-        const zhSubtitle = record.subtitle_zh_cn_json_path || record.subtitle_zh_cn_ass_path;
+        // 检查files.subtitles结构
+        const subtitles = record.files?.subtitles;
         
-        if (!enSubtitle && !zhSubtitle) return '-';
+        if (!subtitles) {
+          // 兼容旧结构
+          const enSubtitle = record.subtitle_en_json_path || record.subtitle_en_ass_path;
+          const zhSubtitle = record.subtitle_zh_cn_json_path || record.subtitle_zh_cn_ass_path;
+          
+          if (!enSubtitle && !zhSubtitle) return '-';
+          
+          return (
+            <Space size="small">
+              {enSubtitle && (
+                <Tooltip title="英文字幕">
+                  <Button 
+                    type="link" 
+                    size="small" 
+                    onClick={() => window.open(getFileUrl(enSubtitle), '_blank')}
+                    style={{ padding: 0 }}
+                  >
+                    EN
+                  </Button>
+                </Tooltip>
+              )}
+              {zhSubtitle && (
+                <Tooltip title="中文字幕">
+                  <Button 
+                    type="link" 
+                    size="small" 
+                    onClick={() => window.open(getFileUrl(zhSubtitle), '_blank')}
+                    style={{ padding: 0 }}
+                  >
+                    中文
+                  </Button>
+                </Tooltip>
+              )}
+            </Space>
+          );
+        }
         
+        // 新结构 - 使用files.subtitles
         return (
-          <Space size="small">
-            {enSubtitle && (
-              <Tooltip title="英文字幕">
+          <Space size="small" wrap>
+            {subtitles.en_json && (
+              <Tooltip title="英文JSON字幕">
                 <Button 
                   type="link" 
                   size="small" 
-                  onClick={() => window.open(getFileUrl(enSubtitle), '_blank')}
+                  onClick={() => window.open(getFileUrl(subtitles.en_json), '_blank')}
                   style={{ padding: 0 }}
                 >
-                  EN
+                  EN-JSON
                 </Button>
               </Tooltip>
             )}
-            {zhSubtitle && (
-              <Tooltip title="中文字幕">
+            {subtitles.zh_json && (
+              <Tooltip title="中文JSON字幕">
                 <Button 
                   type="link" 
                   size="small" 
-                  onClick={() => window.open(getFileUrl(zhSubtitle), '_blank')}
+                  onClick={() => window.open(getFileUrl(subtitles.zh_json), '_blank')}
                   style={{ padding: 0 }}
                 >
-                  中文
+                  中文-JSON
+                </Button>
+              </Tooltip>
+            )}
+            {subtitles.en_ass && (
+              <Tooltip title="英文ASS字幕">
+                <Button 
+                  type="link" 
+                  size="small" 
+                  onClick={() => window.open(getFileUrl(subtitles.en_ass), '_blank')}
+                  style={{ padding: 0 }}
+                >
+                  EN-ASS
+                </Button>
+              </Tooltip>
+            )}
+            {subtitles.zh_ass && (
+              <Tooltip title="中文ASS字幕">
+                <Button 
+                  type="link" 
+                  size="small" 
+                  onClick={() => window.open(getFileUrl(subtitles.zh_ass), '_blank')}
+                  style={{ padding: 0 }}
+                >
+                  中文-ASS
+                </Button>
+              </Tooltip>
+            )}
+            {subtitles.ass && (
+              <Tooltip title="双语ASS字幕">
+                <Button 
+                  type="link" 
+                  size="small" 
+                  onClick={() => window.open(getFileUrl(subtitles.ass), '_blank')}
+                  style={{ padding: 0 }}
+                >
+                  双语-ASS
+                </Button>
+              </Tooltip>
+            )}
+          </Space>
+        );
+      }
+    },
+    {
+      title: '文档',
+      key: 'docs',
+      width: 150,
+      render: (_: any, record: VideoData) => {
+        // 检查files.subtitles结构中的文档
+        const subtitles = record.files?.subtitles;
+        
+        if (!subtitles) {
+          return '-';
+        }
+        
+        return (
+          <Space size="small" wrap>
+            {subtitles.en_md && (
+              <Tooltip title="英文文档">
+                <Button 
+                  type="link" 
+                  size="small" 
+                  onClick={() => window.open(getFileUrl(subtitles.en_md), '_blank')}
+                  style={{ padding: 0 }}
+                >
+                  EN-MD
+                </Button>
+              </Tooltip>
+            )}
+            {subtitles.zh_md && (
+              <Tooltip title="中文文档">
+                <Button 
+                  type="link" 
+                  size="small" 
+                  onClick={() => window.open(getFileUrl(subtitles.zh_md), '_blank')}
+                  style={{ padding: 0 }}
+                >
+                  中文-MD
                 </Button>
               </Tooltip>
             )}
