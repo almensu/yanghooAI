@@ -30,10 +30,10 @@ app.add_middleware(
 )
 
 # 在创建app后，添加静态文件挂载
-app.mount("/static", StaticFiles(directory="frontend"), name="static")
+app.mount("/static", StaticFiles(directory="../frontend"), name="static")
 
 # 添加数据目录的静态文件挂载
-app.mount("/data", StaticFiles(directory="data"), name="data")
+app.mount("/data", StaticFiles(directory="../data"), name="data")
 
 processor = VideoProcessor()
 
@@ -177,13 +177,13 @@ async def read_file(file_path: str):
     if "thumbnail" in file_path:
         print(f"缩略图不存在，返回默认图片")
         # 返回默认缩略图
-        default_thumbnail = "frontend/assets/default-thumbnail.jpg"
+        default_thumbnail = "../frontend/assets/default-thumbnail.jpg"
         if os.path.exists(default_thumbnail):
             return FileResponse(default_thumbnail)
         else:
             # 如果默认缩略图不存在，创建一个
             try:
-                os.makedirs("frontend/assets", exist_ok=True)
+                os.makedirs("../frontend/assets", exist_ok=True)
                 img = Image.new('RGB', (480, 270), color=(200, 200, 200))
                 d = ImageDraw.Draw(img)
                 d.text((240, 135), "No Thumbnail", fill=(80, 80, 80), anchor="mm")
@@ -488,3 +488,147 @@ async def get_video_subtitles(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取字幕失败: {str(e)}")
+
+@app.get("/video/data", 
+    response_model=List[dict],
+    summary="获取原始视频数据",
+    description="获取数据库中的原始视频数据"
+)
+async def get_video_data(
+    skip: int = Query(0, description="跳过的记录数"),
+    limit: int = Query(100, description="返回的记录数")
+):
+    """获取数据库中的原始视频数据"""
+    from sqlalchemy.orm import Session
+    from models.database import SessionLocal, Video
+    
+    db = SessionLocal()
+    try:
+        videos = db.query(Video).offset(skip).limit(limit).all()
+        # 将 SQLAlchemy 模型转换为字典
+        result = []
+        for video in videos:
+            video_dict = {
+                "id": video.id,
+                "title": video.title,
+                "url": video.url,
+                "hash_name": video.hash_name,
+                "folder_hash_name_path": video.folder_hash_name_path,
+                "pic_thumb_path": video.pic_thumb_path,
+                "file_path": video.file_path,
+                "wav_path": video.wav_path,
+                "subtitle_en_json_path": video.subtitle_en_json_path,
+                "subtitle_zh_cn_json_path": video.subtitle_zh_cn_json_path,
+                "subtitle_en_ass_path": video.subtitle_en_ass_path,
+                "subtitle_zh_cn_ass_path": video.subtitle_zh_cn_ass_path,
+                "subtitle_en_md_path": video.subtitle_en_md_path,
+                "subtitle_zh_cn_md_path": video.subtitle_zh_cn_md_path,
+                "created_at": video.created_at.isoformat() if video.created_at else None
+            }
+            result.append(video_dict)
+        return result
+    finally:
+        db.close()
+
+@app.get("/video/{hash_name}/thumbnail", 
+    summary="获取视频缩略图",
+    description="获取视频的缩略图"
+)
+async def get_video_thumbnail(
+    hash_name: str = Path(..., description="视频的唯一 hash 标识")
+):
+    """获取视频的缩略图"""
+    try:
+        print(f"请求获取视频缩略图: {hash_name}")
+        
+        # 获取视频信息
+        video = processor.get_video_by_hash(hash_name)
+        if not video:
+            raise HTTPException(status_code=404, detail="视频不存在")
+        
+        print(f"视频信息: {video.title}, 缩略图路径: {video.pic_thumb_path}, 文件夹路径: {video.folder_hash_name_path}")
+        
+        # 尝试获取缩略图
+        if video.pic_thumb_path and os.path.exists(video.pic_thumb_path):
+            print(f"使用数据库中的缩略图路径: {video.pic_thumb_path}")
+            return FileResponse(video.pic_thumb_path)
+        
+        # 尝试直接使用hash_name构建路径
+        direct_path = f"data/{hash_name}/original/thumbnail.jpg"
+        if os.path.exists(direct_path):
+            print(f"找到直接路径缩略图: {direct_path}")
+            return FileResponse(direct_path)
+            
+        # 尝试使用相对路径
+        relative_path = f"../data/{hash_name}/original/thumbnail.jpg"
+        if os.path.exists(relative_path):
+            print(f"找到相对路径缩略图: {relative_path}")
+            return FileResponse(relative_path)
+        
+        # 如果数据库中的缩略图不存在，尝试查找可能的缩略图文件
+        if video.folder_hash_name_path:
+            original_dir = os.path.join(video.folder_hash_name_path, "original")
+            print(f"尝试在目录中查找: {original_dir}")
+            
+            if os.path.exists(original_dir):
+                # 检查各种可能的缩略图文件名
+                possible_names = [
+                    "thumbnail.jpg",
+                    "thumbnail.webp",
+                    "thumbnail.webp.webp",
+                    "thumbnail.png"
+                ]
+                
+                for name in possible_names:
+                    path = os.path.join(original_dir, name)
+                    if os.path.exists(path):
+                        print(f"找到替代缩略图: {path}")
+                        return FileResponse(path)
+        
+        # 尝试在backend目录下查找
+        backend_path = f"data/{hash_name}/original/thumbnail.jpg"
+        if os.path.exists(backend_path):
+            print(f"找到backend目录下的缩略图: {backend_path}")
+            return FileResponse(backend_path)
+        
+        # 如果没有找到缩略图，返回默认图片
+        default_thumbnail = "../frontend/public/static/assets/default-thumbnail.svg"
+        if os.path.exists(default_thumbnail):
+            print(f"使用默认缩略图: {default_thumbnail}")
+            return FileResponse(default_thumbnail)
+        
+        # 如果默认缩略图也不存在，返回404
+        raise HTTPException(status_code=404, detail="缩略图不存在")
+    except Exception as e:
+        print(f"获取缩略图失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取缩略图失败: {str(e)}")
+
+@app.get("/direct-file/{path:path}", 
+    summary="直接访问文件",
+    description="通过路径直接访问文件"
+)
+async def get_direct_file(
+    path: str = Path(..., description="文件路径")
+):
+    """直接通过路径访问文件"""
+    try:
+        print(f"请求直接访问文件: {path}")
+        
+        # 尝试多种可能的路径
+        possible_paths = [
+            path,
+            f"../{path}",
+            f"data/{path}",
+            f"../data/{path}"
+        ]
+        
+        for p in possible_paths:
+            if os.path.exists(p):
+                print(f"找到文件: {p}")
+                return FileResponse(p)
+        
+        # 如果文件不存在，返回404
+        raise HTTPException(status_code=404, detail="文件不存在")
+    except Exception as e:
+        print(f"访问文件失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"访问文件失败: {str(e)}")

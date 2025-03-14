@@ -39,7 +39,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # 在Windows上使用: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn main:app --reload
 ```
 
 ## 部署
@@ -57,5 +57,24 @@ npm run build
 
 ```bash
 cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+# 确保安装了所需的依赖
+pip install fastapi uvicorn python-multipart pillow sqlalchemy
+
+# 启动服务器
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### 使用conda环境
+
+如果使用conda环境，可以按照以下步骤启动后端：
+
+```bash
+# 激活conda环境
+conda activate auto_ai_subtitle-v0.0.9
+
+# 进入后端目录
+cd backend
+
+# 启动服务器
+uvicorn main:app --host 0.0.0.0 --port 8000
 ``` 

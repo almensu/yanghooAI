@@ -46,4 +46,30 @@ node_modules/
 
 # Project specific
 data/
-*.session.sql 
+*.session.sql
+
+# 忽略Python缓存文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 忽略UMI缓存
+.umi/.cache/
+.umi/
+
+# 忽略构建输出
+dist/
+build/
+
+# 忽略编辑器配置
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 忽略系统文件
+Thumbs.db
+
+# 忽略临时文件
+*.tmp
+temp_* 

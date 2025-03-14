@@ -1,5 +1,7 @@
 import React from 'react';
 import { Menu } from 'antd';
+import { useHistory, useLocation } from 'umi';
+import { HomeOutlined, DatabaseOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import styles from './AppLayout.less';
 
 interface AppLayoutProps {
@@ -7,6 +9,14 @@ interface AppLayoutProps {
 }
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
+  const location = useLocation();
+  const history = useHistory();
+  const { pathname } = location;
+  
+  const handleMenuClick = (path: string) => {
+    history.push(path);
+  };
+  
   return (
     <div className={styles.appContainer}>
       <div className={styles.sider}>
@@ -14,15 +24,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           <div className={styles.logo}>Yanghoovidio</div>
           <Menu
             mode="inline"
-            defaultSelectedKeys={['1']}
+            selectedKeys={[pathname === '/' ? '1' : pathname === '/video-data' ? '2' : '']}
             className={styles.topMenu}
             style={{ 
               borderRight: 'none',
               background: '#F9F9F9'
             }}
           >
-            <Menu.Item key="1">媒体</Menu.Item>
-            <Menu.Item key="2">笔记</Menu.Item>
+            <Menu.Item key="1" icon={<HomeOutlined />} onClick={() => handleMenuClick('/')}>
+              首页
+            </Menu.Item>
+            <Menu.Item key="2" icon={<DatabaseOutlined />} onClick={() => handleMenuClick('/video-data')}>
+              视频数据
+            </Menu.Item>
           </Menu>
         </div>
         
@@ -35,7 +49,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               background: '#F9F9F9'
             }}
           >
-            <Menu.Item key="3">帮助与支持</Menu.Item>
+            <Menu.Item key="3" icon={<QuestionCircleOutlined />}>帮助与支持</Menu.Item>
           </Menu>
         </div>
       </div>

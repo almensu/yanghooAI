@@ -12,6 +12,7 @@ export default defineConfig({
       component: '@/layouts/AppLayout',
       routes: [
         { path: '/', component: '@/pages/Home' },
+        { path: '/video-data', component: '@/pages/VideoData' },
       ],
     },
   ],
@@ -29,4 +30,23 @@ export default defineConfig({
   extraBabelPlugins: [
     ['import', { libraryName: 'antd', libraryDirectory: 'es', style: true }]
   ],
+  proxy: {
+    '/api': {
+      target: 'http://localhost:8000',
+      changeOrigin: true,
+      pathRewrite: { '^/api': '' },
+    },
+    '/videos': {
+      target: 'http://localhost:8000',
+      changeOrigin: true,
+    },
+    '/video': {
+      target: 'http://localhost:8000',
+      changeOrigin: true,
+    },
+    '/data': {
+      target: 'http://localhost:8000',
+      changeOrigin: true,
+    },
+  },
 }); 
