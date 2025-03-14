@@ -1,0 +1,6 @@
+<svg width="80" height="45" viewBox="0 0 80 45" xmlns="http://www.w3.org/2000/svg">
+  <rect width="80" height="45" fill="#f0f0f0"/>
+  <text x="40" y="22.5" font-family="Arial, sans-serif" font-size="10" fill="#999" text-anchor="middle" dominant-baseline="middle">无缩略图</text>
+  <path d="M35,15 L45,15 L45,30 L35,30 Z" fill="#ccc"/>
+  <path d="M30,20 L50,20 L50,25 L30,25 Z" fill="#ccc"/>
+</svg> 
