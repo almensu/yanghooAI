@@ -12,21 +12,41 @@ import {
   Empty, 
   List, 
   Tooltip, 
-  Skeleton
+  Skeleton,
+  Layout,
+  Row,
+  Col,
+  Input,
+  Tag,
+  Affix,
+  Breadcrumb,
+  Collapse,
+  Menu,
+  Dropdown
 } from 'antd';
 import { 
   ArrowLeftOutlined, 
   PlayCircleOutlined, 
   FileTextOutlined, 
   MessageOutlined,
-  ColumnWidthOutlined
+  SearchOutlined,
+  DownloadOutlined,
+  FullscreenOutlined,
+  SettingOutlined,
+  SoundOutlined,
+  InfoCircleOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import { getVideoByHash } from '@/services/video';
 import styles from './index.less';
 
-const { Title, Text } = Typography;
+const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
+const { Header, Content, Sider } = Layout;
+const { Search } = Input;
+const { Panel } = Collapse;
 
 // 字幕项接口
 interface SubtitleItem {
@@ -62,15 +82,30 @@ const VideoPlayerPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [videoData, setVideoData] = useState<any>(null);
   const [subtitles, setSubtitles] = useState<SubtitleItem[]>([]);
+  const [filteredSubtitles, setFilteredSubtitles] = useState<SubtitleItem[]>([]);
   const [currentSubtitle, setCurrentSubtitle] = useState<number | null>(null);
   const [markdownContent, setMarkdownContent] = useState<string>('');
-  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(65);
+  const [activeTab, setActiveTab] = useState<string>('subtitles');
+  const [searchText, setSearchText] = useState<string>('');
+  const [collapsed, setCollapsed] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const subtitlesListRef = useRef<HTMLDivElement>(null);
-  const resizingRef = useRef<boolean>(false);
-  const startXRef = useRef<number>(0);
-  const startWidthRef = useRef<number>(0);
+
+  // 检测屏幕尺寸
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+    };
+  }, []);
 
   // 获取视频数据
   useEffect(() => {
@@ -128,6 +163,7 @@ const VideoPlayerPage: React.FC = () => {
                 }));
                 
                 setSubtitles(mergedSubtitles);
+                setFilteredSubtitles(mergedSubtitles);
                 return;
               }
             } catch (zhErr) {
@@ -144,6 +180,7 @@ const VideoPlayerPage: React.FC = () => {
           }));
           
           setSubtitles(enSubtitles);
+          setFilteredSubtitles(enSubtitles);
         }
       }
     } catch (err) {
@@ -211,73 +248,86 @@ const VideoPlayerPage: React.FC = () => {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  // 处理面板调整大小
-  const handleResizeStart = (e: React.MouseEvent) => {
-    resizingRef.current = true;
-    startXRef.current = e.clientX;
-    startWidthRef.current = leftPanelWidth;
-    
-    document.addEventListener('mousemove', handleResizeMove);
-    document.addEventListener('mouseup', handleResizeEnd);
-  };
-
-  const handleResizeMove = (e: MouseEvent) => {
-    if (!resizingRef.current) return;
-    
-    const containerWidth = document.querySelector(`.${styles.contentContainer}`)?.clientWidth || 1000;
-    const deltaX = e.clientX - startXRef.current;
-    const newWidth = Math.min(Math.max(30, startWidthRef.current + (deltaX / containerWidth) * 100), 80);
-    
-    setLeftPanelWidth(newWidth);
-  };
-
-  const handleResizeEnd = () => {
-    resizingRef.current = false;
-    document.removeEventListener('mousemove', handleResizeMove);
-    document.removeEventListener('mouseup', handleResizeEnd);
-  };
-
   // 返回上一页
   const handleGoBack = () => {
     history.goBack();
   };
 
-  // 渲染页面
-  return (
-    <div className={styles.videoPlayerPage}>
-      <Card className={styles.pageHeader}>
-        <Space align="center">
-          <Button 
-            type="text" 
-            icon={<ArrowLeftOutlined />} 
-            onClick={handleGoBack}
-          />
-          <Title level={3} style={{ margin: 0 }}>
-            {loading ? '加载中...' : videoData?.title || '未知视频'}
-          </Title>
-        </Space>
-      </Card>
+  // 搜索字幕
+  const handleSearchSubtitles = (value: string) => {
+    setSearchText(value);
+    if (!value.trim()) {
+      setFilteredSubtitles(subtitles);
+      return;
+    }
+    
+    const filtered = subtitles.filter(subtitle => {
+      const searchValue = value.toLowerCase();
+      return (
+        (subtitle.text && subtitle.text.toLowerCase().includes(searchValue)) ||
+        (subtitle.text_zh && subtitle.text_zh.toLowerCase().includes(searchValue))
+      );
+    });
+    
+    setFilteredSubtitles(filtered);
+  };
 
-      {loading ? (
-        <div className={styles.loadingContainer}>
-          <Spin size="large" />
-          <p>加载视频数据中...</p>
-        </div>
-      ) : error ? (
-        <Alert
-          message="获取视频失败"
-          description={error}
-          type="error"
-          showIcon
+  // 切换侧边栏折叠状态
+  const toggleSidebar = () => {
+    setCollapsed(!collapsed);
+  };
+
+  // 渲染字幕列表
+  const renderSubtitlesList = () => {
+    if (filteredSubtitles.length === 0) {
+      return (
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={searchText ? "没有找到匹配的字幕" : "暂无字幕"}
         />
-      ) : (
-        <div className={styles.contentContainer}>
-          {/* 左侧面板：视频播放器和文档 */}
-          <div 
-            className={styles.leftPanel} 
-            style={{ width: `${leftPanelWidth}%` }}
+      );
+    }
+
+    return (
+      <List
+        dataSource={filteredSubtitles}
+        renderItem={(subtitle, index) => (
+          <List.Item 
+            key={subtitle.id}
+            id={`subtitle-${subtitle.id}`}
+            className={currentSubtitle === subtitle.id ? styles.activeSubtitle : ''}
+            onClick={() => handleSubtitleClick(subtitle)}
           >
-            {/* 视频播放器 */}
+            <div className={styles.subtitleItem}>
+              <div className={styles.subtitleHeader}>
+                <Tag color="blue">{formatTime(subtitle.start)}</Tag>
+                <Text type="secondary">-</Text>
+                <Tag color="blue">{formatTime(subtitle.end)}</Tag>
+              </div>
+              <div className={styles.subtitleContent}>
+                <Paragraph className={styles.subtitleTextEn}>
+                  {subtitle.text}
+                </Paragraph>
+                {subtitle.text_zh && (
+                  <Paragraph className={styles.subtitleTextZh}>
+                    {subtitle.text_zh}
+                  </Paragraph>
+                )}
+              </div>
+            </div>
+          </List.Item>
+        )}
+      />
+    );
+  };
+
+  // 渲染移动端布局
+  const renderMobileLayout = () => {
+    return (
+      <Layout className={styles.mobileLayout}>
+        <Content className={styles.mobileContent}>
+          {/* 视频播放器 */}
+          <Card className={styles.videoCard} bordered={false}>
             <div className={styles.videoContainer}>
               {videoData?.files?.video ? (
                 <video
@@ -295,77 +345,268 @@ const VideoPlayerPage: React.FC = () => {
                 </div>
               )}
             </div>
-
-            {/* 文档内容 */}
-            <div className={styles.documentContainer}>
-              <Divider orientation="left">
-                <Space>
-                  <FileTextOutlined />
-                  <span>文档内容</span>
-                </Space>
-              </Divider>
-              
-              {markdownContent ? (
-                <div className={styles.markdownContent}>
-                  <ReactMarkdown>{markdownContent}</ReactMarkdown>
+          </Card>
+          
+          {/* 标签页切换字幕和文档 */}
+          <Card className={styles.tabsCard} bordered={false}>
+            <Tabs 
+              defaultActiveKey="subtitles" 
+              onChange={setActiveTab}
+              tabBarExtraContent={
+                activeTab === 'subtitles' ? (
+                  <Search
+                    placeholder="搜索字幕"
+                    allowClear
+                    size="small"
+                    onSearch={handleSearchSubtitles}
+                    onChange={(e) => handleSearchSubtitles(e.target.value)}
+                    style={{ width: 150 }}
+                  />
+                ) : null
+              }
+            >
+              <TabPane 
+                tab={
+                  <span>
+                    <MessageOutlined />
+                    字幕
+                  </span>
+                } 
+                key="subtitles"
+              >
+                <div className={styles.subtitlesList} ref={subtitlesListRef}>
+                  {renderSubtitlesList()}
                 </div>
-              ) : (
-                <div className={styles.noDocument}>
-                  <FileTextOutlined style={{ fontSize: 32, color: '#d9d9d9' }} />
-                  <p>暂无文档内容</p>
-                </div>
-              )}
-            </div>
-            
-            {/* 调整大小的手柄 */}
-            <div 
-              className={styles.resizableHandle}
-              onMouseDown={handleResizeStart}
-            />
-          </div>
-
-          {/* 右侧面板：字幕 */}
-          <div className={styles.rightPanel}>
-            <div className={styles.subtitlesHeader}>
-              <Space>
-                <MessageOutlined />
-                <span>字幕</span>
-                <Text type="secondary">({subtitles.length})</Text>
-              </Space>
-            </div>
-            
-            {subtitles.length > 0 ? (
-              <div className={styles.subtitlesList} ref={subtitlesListRef}>
-                {subtitles.map((subtitle, index) => (
-                  <div
-                    key={subtitle.id}
-                    id={`subtitle-${index}`}
-                    className={`${styles.subtitleItem} ${currentSubtitle === index ? styles.active : ''}`}
-                    onClick={() => handleSubtitleClick(subtitle)}
-                  >
-                    <div className={styles.timestamp}>
-                      {formatTime(subtitle.start)} - {formatTime(subtitle.end)}
-                    </div>
-                    <div className={styles.subtitleTextEn}>
-                      {subtitle.text}
-                    </div>
-                    {subtitle.text_zh && (
-                      <div className={styles.subtitleTextZh}>
-                        {subtitle.text_zh}
-                      </div>
-                    )}
+              </TabPane>
+              <TabPane 
+                tab={
+                  <span>
+                    <FileTextOutlined />
+                    文档
+                  </span>
+                } 
+                key="document"
+              >
+                {markdownContent ? (
+                  <div className={styles.markdownContent}>
+                    <ReactMarkdown>{markdownContent}</ReactMarkdown>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.noSubtitles}>
-                <MessageOutlined style={{ fontSize: 32, color: '#d9d9d9' }} />
-                <p>暂无字幕</p>
-              </div>
+                ) : (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="暂无文档内容"
+                  />
+                )}
+              </TabPane>
+              <TabPane 
+                tab={
+                  <span>
+                    <InfoCircleOutlined />
+                    信息
+                  </span>
+                } 
+                key="info"
+              >
+                <Descriptions 
+                  title="视频信息" 
+                  bordered 
+                  size="small"
+                  column={1}
+                >
+                  <Descriptions.Item label="标题">{videoData?.title || '未知'}</Descriptions.Item>
+                  <Descriptions.Item label="来源">{videoData?.url || '未知'}</Descriptions.Item>
+                  <Descriptions.Item label="创建时间">
+                    {videoData?.created_at ? new Date(videoData.created_at).toLocaleString('zh-CN') : '未知'}
+                  </Descriptions.Item>
+                </Descriptions>
+              </TabPane>
+            </Tabs>
+          </Card>
+        </Content>
+      </Layout>
+    );
+  };
+
+  // 渲染桌面端布局
+  const renderDesktopLayout = () => {
+    return (
+      <Layout className={styles.desktopLayout}>
+        <Content className={styles.mainContent}>
+          <Row gutter={16}>
+            {/* 左侧：视频和文档 */}
+            <Col span={collapsed ? 22 : 16}>
+              <Card className={styles.videoCard} bordered={false}>
+                <div className={styles.videoContainer}>
+                  {videoData?.files?.video ? (
+                    <video
+                      ref={videoRef}
+                      className={styles.videoPlayer}
+                      src={getFileUrl(videoData.files.video)}
+                      controls
+                      autoPlay
+                      onTimeUpdate={handleTimeUpdate}
+                    />
+                  ) : (
+                    <div className={styles.noVideo}>
+                      <PlayCircleOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />
+                      <p>视频文件不可用</p>
+                    </div>
+                  )}
+                </div>
+              </Card>
+              
+              <Card 
+                className={styles.documentCard} 
+                title={
+                  <Space>
+                    <FileTextOutlined />
+                    <span>文档内容</span>
+                  </Space>
+                }
+                bordered={false}
+                style={{ marginTop: 16 }}
+              >
+                {markdownContent ? (
+                  <div className={styles.markdownContent}>
+                    <ReactMarkdown>{markdownContent}</ReactMarkdown>
+                  </div>
+                ) : (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="暂无文档内容"
+                  />
+                )}
+              </Card>
+            </Col>
+            
+            {/* 右侧：字幕 */}
+            {!collapsed && (
+              <Col span={8}>
+                <Card 
+                  className={styles.subtitlesCard} 
+                  title={
+                    <Space>
+                      <MessageOutlined />
+                      <span>字幕</span>
+                      <Text type="secondary">({filteredSubtitles.length})</Text>
+                    </Space>
+                  }
+                  extra={
+                    <Search
+                      placeholder="搜索字幕"
+                      allowClear
+                      size="small"
+                      onSearch={handleSearchSubtitles}
+                      onChange={(e) => handleSearchSubtitles(e.target.value)}
+                      style={{ width: 150 }}
+                    />
+                  }
+                  bordered={false}
+                >
+                  <div className={styles.subtitlesList} ref={subtitlesListRef}>
+                    {renderSubtitlesList()}
+                  </div>
+                </Card>
+              </Col>
             )}
-          </div>
+          </Row>
+        </Content>
+        
+        {/* 折叠按钮 */}
+        <Affix className={styles.collapseButton} offsetTop={100}>
+          <Button 
+            type="primary" 
+            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={toggleSidebar}
+            shape="circle"
+          />
+        </Affix>
+      </Layout>
+    );
+  };
+
+  // 渲染页面
+  return (
+    <Layout className={styles.videoPlayerPage}>
+      <Card className={styles.pageHeader}>
+        <Row justify="space-between" align="middle">
+          <Col>
+            <Space align="center">
+              <Button 
+                type="text" 
+                icon={<ArrowLeftOutlined />} 
+                onClick={handleGoBack}
+              />
+              <Title level={3} style={{ margin: 0 }}>
+                {loading ? '加载中...' : videoData?.title || '未知视频'}
+              </Title>
+            </Space>
+          </Col>
+          <Col>
+            <Space>
+              {videoData?.files?.subtitles?.en_json && (
+                <Tooltip title="下载英文字幕">
+                  <Button 
+                    icon={<DownloadOutlined />} 
+                    href={getFileUrl(videoData.files.subtitles.en_json)}
+                    target="_blank"
+                  >
+                    EN
+                  </Button>
+                </Tooltip>
+              )}
+              {videoData?.files?.subtitles?.zh_json && (
+                <Tooltip title="下载中文字幕">
+                  <Button 
+                    icon={<DownloadOutlined />} 
+                    href={getFileUrl(videoData.files.subtitles.zh_json)}
+                    target="_blank"
+                  >
+                    中文
+                  </Button>
+                </Tooltip>
+              )}
+            </Space>
+          </Col>
+        </Row>
+      </Card>
+
+      {loading ? (
+        <div className={styles.loadingContainer}>
+          <Spin size="large" />
+          <p>加载视频数据中...</p>
         </div>
+      ) : error ? (
+        <Alert
+          message="获取视频失败"
+          description={error}
+          type="error"
+          showIcon
+        />
+      ) : (
+        isMobile ? renderMobileLayout() : renderDesktopLayout()
       )}
+    </Layout>
+  );
+};
+
+// 添加缺少的Descriptions组件
+const Descriptions = ({ title, bordered, size, column, children }: any) => {
+  return (
+    <div className={styles.descriptions}>
+      <h3>{title}</h3>
+      <div className={styles.descriptionsContent}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+Descriptions.Item = ({ label, children }: any) => {
+  return (
+    <div className={styles.descriptionsItem}>
+      <div className={styles.descriptionsLabel}>{label}</div>
+      <div className={styles.descriptionsValue}>{children}</div>
     </div>
   );
 };
