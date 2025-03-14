@@ -1,15 +1,20 @@
-from fastapi import FastAPI, HTTPException, Query, Path, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Query, Path, UploadFile, File, Form, Request, Body
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from services.video_processor import VideoProcessor
 from models.database import init_db, Video
 from pydantic import BaseModel, HttpUrl
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict, Any
 from datetime import datetime
 import os
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageDraw, ImageFont
 import json
+from utils.logger import app_logger, api_logger, init_logging
+import time
+
+# 初始化日志系统
+init_logging()
 
 # 创建 FastAPI 应用
 app = FastAPI(
@@ -19,6 +24,29 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# 添加请求日志中间件
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    
+    # 记录请求信息
+    api_logger.info(f"Request: {request.method} {request.url.path}")
+    
+    # 处理请求
+    try:
+        response = await call_next(request)
+        process_time = time.time() - start_time
+        
+        # 记录响应信息
+        api_logger.info(f"Response: {request.method} {request.url.path} - Status: {response.status_code} - Time: {process_time:.4f}s")
+        
+        return response
+    except Exception as e:
+        # 记录异常信息
+        process_time = time.time() - start_time
+        api_logger.error(f"Error: {request.method} {request.url.path} - {str(e)} - Time: {process_time:.4f}s")
+        raise
 
 # 添加 CORS 中间件
 app.add_middleware(
@@ -198,7 +226,20 @@ async def read_file(file_path: str):
 @app.on_event("startup")
 async def startup():
     """启动时初始化数据库"""
-    init_db()
+    app_logger.info("应用启动中...")
+    try:
+        init_db()
+        app_logger.info("数据库初始化成功")
+    except Exception as e:
+        app_logger.error(f"数据库初始化失败: {str(e)}")
+        raise
+
+@app.on_event("shutdown")
+async def shutdown():
+    """应用关闭时的清理工作"""
+    app_logger.info("应用关闭中...")
+    # 在这里添加任何需要的清理代码
+    app_logger.info("应用已关闭")
 
 @app.post("/process", 
     response_model=VideoResponse,
@@ -216,9 +257,12 @@ async def process_video(video_req: VideoRequest):
     - 生成双语字幕文件
     """
     try:
+        app_logger.info(f"开始处理视频: {video_req.url}")
         video = processor.process_video(str(video_req.url))
+        app_logger.info(f"视频处理成功: {video.hash_name}")
         return VideoResponse.from_db_model(video)
     except Exception as e:
+        app_logger.error(f"视频处理失败: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/batch-process", 
@@ -632,3 +676,135 @@ async def get_direct_file(
     except Exception as e:
         print(f"访问文件失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"访问文件失败: {str(e)}")
+
+@app.get("/video/{hash_name}/transcript/raw", 
+    summary="获取视频原始转写JSON",
+    description="获取WhisperX生成的原始转写JSON文件"
+)
+async def get_original_transcript(
+    hash_name: str = Path(..., description="视频的唯一 hash 标识")
+):
+    """
+    获取视频的原始转写JSON文件:
+    - 查找视频记录
+    - 检查原始转写JSON文件是否存在
+    - 返回JSON文件内容
+    """
+    try:
+        api_logger.info(f"请求获取视频原始转写: {hash_name}")
+        
+        # 获取视频信息
+        video = processor.get_video_by_hash(hash_name)
+        if not video:
+            api_logger.warning(f"视频未找到: {hash_name}")
+            raise HTTPException(status_code=404, detail=f"视频未找到: {hash_name}")
+        
+        api_logger.info(f"找到视频: {hash_name}, 标题: {video.title}")
+        
+        # 检查原始转写JSON文件是否存在
+        json_path = None
+        
+        # 检查旧结构
+        if video.subtitle_en_json_path and os.path.exists(video.subtitle_en_json_path):
+            json_path = video.subtitle_en_json_path
+            api_logger.info(f"使用旧结构的JSON路径: {json_path}")
+        
+        # 如果没有找到，检查可能的位置
+        if not json_path and video.folder_hash_name_path:
+            subtitles_dir = os.path.join(video.folder_hash_name_path, "subtitles")
+            api_logger.info(f"检查字幕目录: {subtitles_dir}")
+            
+            if not os.path.exists(subtitles_dir):
+                api_logger.warning(f"字幕目录不存在: {subtitles_dir}")
+                os.makedirs(subtitles_dir, exist_ok=True)
+                api_logger.info(f"创建字幕目录: {subtitles_dir}")
+            
+            possible_paths = [
+                os.path.join(subtitles_dir, "whisperx.json"),  # 优先查找whisperx.json
+                os.path.join(subtitles_dir, "en.json"),
+                os.path.join(subtitles_dir, "original.json")
+            ]
+            
+            for path in possible_paths:
+                api_logger.info(f"检查可能的JSON路径: {path}")
+                if os.path.exists(path):
+                    json_path = path
+                    api_logger.info(f"找到JSON文件: {json_path}")
+                    break
+        
+        if not json_path:
+            api_logger.warning(f"原始转写JSON文件未找到: {hash_name}")
+            
+            # 尝试创建一个空的JSON文件作为临时解决方案
+            if video.folder_hash_name_path:
+                subtitles_dir = os.path.join(video.folder_hash_name_path, "subtitles")
+                os.makedirs(subtitles_dir, exist_ok=True)
+                temp_json_path = os.path.join(subtitles_dir, "en.json")
+                
+                # 创建一个基本的空转写结果
+                empty_transcript = {
+                    "segments": [],
+                    "language": "en"
+                }
+                
+                with open(temp_json_path, 'w', encoding='utf-8') as f:
+                    json.dump(empty_transcript, f, ensure_ascii=False, indent=4)
+                
+                api_logger.info(f"创建了临时JSON文件: {temp_json_path}")
+                json_path = temp_json_path
+            else:
+                raise HTTPException(status_code=404, detail=f"原始转写JSON文件未找到: {hash_name}")
+        
+        # 读取JSON文件内容
+        try:
+            api_logger.info(f"读取JSON文件: {json_path}")
+            with open(json_path, 'r', encoding='utf-8') as f:
+                transcript_data = json.load(f)
+                api_logger.info(f"成功读取JSON文件: {json_path}")
+                return transcript_data
+        except Exception as e:
+            api_logger.error(f"读取JSON文件失败: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"读取JSON文件失败: {str(e)}")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        api_logger.error(f"获取原始转写失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 前端日志模型
+class FrontendLog(BaseModel):
+    timestamp: str
+    level: str
+    message: str
+    details: Optional[Dict[str, Any]] = None
+    context: Optional[str] = None
+
+@app.post("/api/logs", 
+    summary="接收前端日志",
+    description="接收并存储前端发送的日志"
+)
+async def receive_frontend_logs(log: FrontendLog = Body(...)):
+    """接收前端日志并存储"""
+    try:
+        # 记录前端日志到后端日志文件
+        log_message = f"Frontend Log [{log.level.upper()}] [{log.context or 'frontend'}]: {log.message}"
+        
+        # 根据日志级别选择不同的日志方法
+        if log.level == "error":
+            app_logger.error(log_message, exc_info=False)
+        elif log.level == "warn":
+            app_logger.warning(log_message)
+        elif log.level == "debug":
+            app_logger.debug(log_message)
+        else:
+            app_logger.info(log_message)
+            
+        # 如果有详细信息，也记录下来
+        if log.details:
+            app_logger.debug(f"Frontend Log Details: {json.dumps(log.details)}")
+            
+        return {"status": "success"}
+    except Exception as e:
+        app_logger.error(f"处理前端日志失败: {str(e)}", exc_info=True)
+        return {"status": "error", "message": str(e)}

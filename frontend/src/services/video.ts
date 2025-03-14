@@ -2,9 +2,10 @@
 import axios from 'axios';
 import { format } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
+import logger from '@/utils/logger';
 
 // API基础URL
-const API_BASE_URL = '/api';
+export const API_BASE_URL = '/api';
 
 // 检查后端服务是否可用
 async function checkBackendStatus(): Promise<boolean> {
@@ -103,37 +104,62 @@ function generateMockVideos(): VideoDisplay[] {
 }
 
 /**
- * 从后端获取视频列表
+ * 处理新视频
  */
-export async function getVideos(): Promise<any[]> {
+export async function processVideo(url: string): Promise<any> {
   try {
-    console.log('获取视频列表...');
+    logger.info('开始处理视频', { url });
     
-    // 检查后端服务状态
-    const isBackendAvailable = await checkBackendStatus();
-    if (!isBackendAvailable) {
-      console.warn('后端服务不可用，无法获取视频数据');
-      return [];
-    }
-    
-    // 直接从/videos端点获取数据
-    const response = await axios.get(`${API_BASE_URL}/videos`, { 
-      timeout: 5000,
+    const response = await axios.post(`${API_BASE_URL}/process`, {
+      url
+    }, {
       headers: { 'Content-Type': 'application/json' }
     });
     
-    console.log('视频列表响应:', response.data);
-    
-    if (Array.isArray(response.data)) {
-      return response.data;
-    } else if (response.data && typeof response.data === 'object' && response.data.data) {
-      return response.data.data;
-    }
-    
-    return [];
+    logger.info('视频处理成功', { hash_name: response.data.hash_name });
+    return response.data;
   } catch (error) {
-    console.error('获取视频列表失败:', error);
-    return [];
+    logger.error('处理视频失败', { error, url });
+    throw error;
+  }
+}
+
+/**
+ * 获取视频列表
+ */
+export async function getVideos(skip: number = 0, limit: number = 10): Promise<any[]> {
+  try {
+    logger.info('获取视频列表', { skip, limit });
+    
+    const response = await axios.get(`${API_BASE_URL}/videos`, {
+      params: { skip, limit },
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    logger.info('获取视频列表成功', { count: response.data.length });
+    return response.data;
+  } catch (error) {
+    logger.error('获取视频列表失败', { error, skip, limit });
+    throw error;
+  }
+}
+
+/**
+ * 获取视频详情
+ */
+export async function getVideoDetail(hash_name: string): Promise<any> {
+  try {
+    logger.info('获取视频详情', { hash_name });
+    
+    const response = await axios.get(`${API_BASE_URL}/video/${hash_name}`, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    logger.info('获取视频详情成功', { hash_name });
+    return response.data;
+  } catch (error) {
+    logger.error('获取视频详情失败', { error, hash_name });
+    throw error;
   }
 }
 
@@ -142,11 +168,75 @@ export async function getVideos(): Promise<any[]> {
  */
 export async function deleteVideo(hash_name: string): Promise<boolean> {
   try {
-    await axios.delete(`${API_BASE_URL}/video/${hash_name}`);
-    return true;
+    logger.info('删除视频', { hash_name });
+    
+    const response = await axios.delete(`${API_BASE_URL}/video/${hash_name}`, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    logger.info('删除视频成功', { hash_name });
+    return response.data.status === 'success';
   } catch (error) {
-    console.error('删除视频失败:', error);
-    return false;
+    logger.error('删除视频失败', { error, hash_name });
+    throw error;
+  }
+}
+
+/**
+ * 获取视频数据
+ */
+export async function getVideoData(): Promise<any[]> {
+  try {
+    logger.info('获取视频数据');
+    
+    const response = await axios.get(`${API_BASE_URL}/video/data`, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    logger.info('获取视频数据成功', { count: response.data.length });
+    return response.data;
+  } catch (error) {
+    logger.error('获取视频数据失败', { error });
+    throw error;
+  }
+}
+
+/**
+ * 获取视频字幕
+ */
+export async function getVideoSubtitles(hash_name: string): Promise<any> {
+  try {
+    logger.info('获取视频字幕', { hash_name });
+    
+    const response = await axios.get(`${API_BASE_URL}/video/${hash_name}/subtitles`, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    logger.info('获取视频字幕成功', { hash_name });
+    return response.data;
+  } catch (error) {
+    logger.error('获取视频字幕失败', { error, hash_name });
+    throw error;
+  }
+}
+
+/**
+ * 获取视频的原始转写JSON
+ */
+export async function getOriginalTranscript(hash_name: string): Promise<any> {
+  try {
+    logger.info('获取视频原始转写', { hash_name });
+    
+    const response = await axios.get(`${API_BASE_URL}/video/${hash_name}/transcript/raw`, {
+      timeout: 5000,
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    logger.info('获取视频原始转写成功', { hash_name });
+    return response.data;
+  } catch (error) {
+    logger.error('获取原始转写JSON失败', { error, hash_name });
+    throw error;
   }
 }
 
@@ -206,41 +296,6 @@ export async function addVideo(url: string): Promise<VideoDisplay | null> {
   } catch (error) {
     console.error('添加视频失败:', error);
     return null;
-  }
-}
-
-/**
- * 从后端获取原始视频数据库数据
- */
-export async function getVideoData(): Promise<any[]> {
-  try {
-    console.log('获取原始视频数据库数据...');
-    
-    // 检查后端服务状态
-    const isBackendAvailable = await checkBackendStatus();
-    if (!isBackendAvailable) {
-      console.warn('后端服务不可用，无法获取原始数据');
-      return [];
-    }
-    
-    // 使用/videos端点而不是/video/data端点
-    const response = await axios.get(`${API_BASE_URL}/videos`, { 
-      timeout: 5000,
-      headers: { 'Content-Type': 'application/json' }
-    });
-    
-    console.log('原始视频数据库响应:', response.data);
-    
-    if (Array.isArray(response.data)) {
-      return response.data;
-    } else if (response.data && typeof response.data === 'object' && response.data.data) {
-      return response.data.data;
-    }
-    
-    return [];
-  } catch (error) {
-    console.error('获取原始视频数据失败:', error);
-    return [];
   }
 }
 

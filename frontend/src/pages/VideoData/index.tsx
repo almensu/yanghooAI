@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Typography, Card, Spin, Alert, Button, Space, Input, Popconfirm, message, Tooltip, Modal, Image } from 'antd';
 
-import { ReloadOutlined, DatabaseOutlined, SearchOutlined, EyeOutlined, DeleteOutlined, FileImageOutlined } from '@ant-design/icons';
-import { getVideoData, deleteVideo } from '@/services/video';
+import { ReloadOutlined, DatabaseOutlined, SearchOutlined, EyeOutlined, DeleteOutlined, FileImageOutlined, FileTextOutlined } from '@ant-design/icons';
+import { getVideoData, deleteVideo, getOriginalTranscript } from '@/services/video';
 import styles from './index.less';
 
 const { Title } = Typography;
@@ -41,6 +41,7 @@ interface VideoData {
   subtitle_zh_cn_json_path?: string;
   subtitle_zh_cn_ass_path?: string;
   folder_hash_name_path?: string;
+  has_original_transcript?: boolean;
   files?: {
     subtitles?: {
       en_json?: string;
@@ -54,6 +55,26 @@ interface VideoData {
   };
   [key: string]: any;
 }
+
+// 检查是否有原始转写文件
+const hasOriginalTranscript = (record: VideoData): boolean => {
+  // 检查新结构
+  if (record.files?.subtitles?.en_json) {
+    return true;
+  }
+  
+  // 检查旧结构
+  if (record.subtitle_en_json_path) {
+    return true;
+  }
+  
+  // 检查后端提供的标志
+  if (record.has_original_transcript) {
+    return true;
+  }
+  
+  return false;
+};
 
 const VideoDataPage: React.FC = () => {
   const [videoData, setVideoData] = useState<VideoData[]>([]);
@@ -123,6 +144,17 @@ const VideoDataPage: React.FC = () => {
   // 查看详情
   const handleViewDetails = (hash_name: string) => {
     window.open(`/video/${hash_name}`, '_blank');
+  };
+
+  // 查看原始转写
+  const handleViewOriginalTranscript = async (hash_name: string) => {
+    try {
+      // 跳转到转写页面
+      window.open(`/transcript/${hash_name}`, '_blank');
+    } catch (error) {
+      console.error('查看原始转写失败:', error);
+      message.error('查看原始转写失败');
+    }
   };
 
   // 处理图片预览
@@ -295,7 +327,19 @@ const VideoDataPage: React.FC = () => {
           if (!enSubtitle && !zhSubtitle) return '-';
           
           return (
-            <Space size="small">
+            <Space size="small" wrap>
+              {record.subtitle_en_json_path && (
+                <Tooltip title="WhisperX 原始转写">
+                  <Button 
+                    type="link" 
+                    size="small" 
+                    onClick={() => window.open(getFileUrl(record.subtitle_en_json_path), '_blank')}
+                    style={{ padding: 0, fontWeight: 'bold', color: '#1890ff' }}
+                  >
+                    WhisperX转写
+                  </Button>
+                </Tooltip>
+              )}
               {enSubtitle && (
                 <Tooltip title="英文字幕">
                   <Button 
@@ -327,6 +371,18 @@ const VideoDataPage: React.FC = () => {
         // 新结构 - 使用files.subtitles
         return (
           <Space size="small" wrap>
+            {subtitles.en_json && (
+              <Tooltip title="WhisperX 原始转写">
+                <Button 
+                  type="link" 
+                  size="small" 
+                  onClick={() => window.open(getFileUrl(subtitles.en_json), '_blank')}
+                  style={{ padding: 0, fontWeight: 'bold', color: '#1890ff' }}
+                >
+                  WhisperX转写
+                </Button>
+              </Tooltip>
+            )}
             {subtitles.en_json && (
               <Tooltip title="英文JSON字幕">
                 <Button 
@@ -434,6 +490,51 @@ const VideoDataPage: React.FC = () => {
       }
     },
     {
+      title: '原始转写',
+      key: 'original_transcript',
+      width: 100,
+      render: (_: any, record: VideoData) => {
+        if (!hasOriginalTranscript(record)) {
+          return '-';
+        }
+        
+        // 确定原始转写文件的路径
+        let transcriptPath = '';
+        if (record.files?.subtitles?.en_json) {
+          transcriptPath = record.files.subtitles.en_json;
+        } else if (record.subtitle_en_json_path) {
+          transcriptPath = record.subtitle_en_json_path;
+        }
+        
+        return (
+          <Space size="small">
+            {transcriptPath && (
+              <Tooltip title="查看文件">
+                <Button 
+                  type="link" 
+                  size="small" 
+                  onClick={() => window.open(getFileUrl(transcriptPath), '_blank')}
+                  style={{ padding: 0 }}
+                >
+                  查看文件
+                </Button>
+              </Tooltip>
+            )}
+            <Tooltip title="API访问">
+              <Button 
+                type="link" 
+                size="small" 
+                onClick={() => handleViewOriginalTranscript(record.hash_name)}
+                style={{ padding: 0 }}
+              >
+                API访问
+              </Button>
+            </Tooltip>
+          </Space>
+        );
+      }
+    },
+    {
       title: '操作',
       key: 'action',
       width: 120,
@@ -447,6 +548,16 @@ const VideoDataPage: React.FC = () => {
               size="small"
             />
           </Tooltip>
+          {hasOriginalTranscript(record) && (
+            <Tooltip title="查看原始转写">
+              <Button
+                type="text"
+                icon={<FileTextOutlined />}
+                onClick={() => handleViewOriginalTranscript(record.hash_name)}
+                size="small"
+              />
+            </Tooltip>
+          )}
           <Popconfirm
             title="确定要删除这个视频吗？"
             onConfirm={() => handleDelete(record.hash_name)}

@@ -11,21 +11,16 @@ from typing import Optional, List
 from datetime import datetime
 from config import settings
 import json  # 添加到文件顶部的导入部分
-import logging
 import shutil
 import threading
 from PIL import Image
 import subprocess
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+from utils.logger import get_logger
 
 class VideoProcessor:
     def __init__(self):
         self.db = SessionLocal()
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger("video_processor")
         
     def get_videos(self, skip: int = 0, limit: int = 10) -> List[Video]:
         """获取视频列表，支持分页"""
@@ -55,19 +50,56 @@ class VideoProcessor:
             
     def transcribe_audio(self, audio_path: str, output_dir: str) -> str:
         """使用whisperx进行语音识别"""
-        device = "cpu"
-        compute_type = "int8"
-        model = whisperx.load_model("large-v3", device, compute_type=compute_type)
-        
-        audio = whisperx.load_audio(audio_path)
-        result = model.transcribe(audio, batch_size=8)
-        
-        # 使用固定的输出文件名
-        json_path = os.path.join(output_dir, "en.json")
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(result, f, ensure_ascii=False, indent=4)
+        try:
+            self.logger.info(f"开始转写音频: {audio_path}")
             
-        return json_path
+            # 1. 加载模型并进行初始转写
+            device = "cpu"
+            compute_type = "int8"
+            model = whisperx.load_model("large-v3", device, compute_type=compute_type)
+            
+            audio = whisperx.load_audio(audio_path)
+            result = model.transcribe(audio, batch_size=8)
+            
+            self.logger.info(f"初始转写完成，检测到语言: {result['language']}")
+            
+            # 2. 加载对齐模型并进行单词级别对齐
+            try:
+                align_model, align_metadata = whisperx.load_align_model(
+                    language_code=result["language"],
+                    device=device
+                )
+                
+                # 进行单词级别对齐
+                result = whisperx.align(
+                    result["segments"],
+                    align_model,
+                    align_metadata,
+                    audio,
+                    device,
+                    return_char_alignments=False  # 不需要字符级别对齐
+                )
+                
+                self.logger.info("单词级别对齐完成")
+            except Exception as align_error:
+                self.logger.error(f"单词级别对齐失败: {str(align_error)}")
+                # 对齐失败时继续使用原始转写结果
+            
+            # 使用更明确的输出文件名，区分WhisperX转写结果
+            json_path = os.path.join(output_dir, "whisperx.json")
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(result, f, ensure_ascii=False, indent=4)
+                
+            # 同时保存一个en.json副本，以保持兼容性
+            en_json_path = os.path.join(output_dir, "en.json")
+            with open(en_json_path, 'w', encoding='utf-8') as f:
+                json.dump(result, f, ensure_ascii=False, indent=4)
+                
+            return json_path
+            
+        except Exception as e:
+            self.logger.error(f"转写音频失败: {str(e)}")
+            raise
         
     def process_video(self, url: str) -> Optional[Video]:
         """处理视频流程"""

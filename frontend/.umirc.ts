@@ -9,11 +9,13 @@ export default defineConfig({
   routes: [
     {
       path: '/',
-      component: '@/layouts/AppLayout',
+      component: '@/layouts/BasicLayout',
       routes: [
-        { path: '/', component: '@/pages/Home' },
+        { path: '/', component: '@/pages/index' },
         { path: '/video-data', component: '@/pages/VideoData' },
-        { path: '/video/:hash_name', component: '@/pages/VideoPlayer' },
+        { path: '/video/:hash_name', component: '@/pages/VideoDetail' },
+        { path: '/transcript/:hash_name', component: '@/pages/TranscriptPage' },
+        { path: '/logs', component: '@/pages/LogViewer' },
       ],
     },
   ],

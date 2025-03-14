@@ -24,6 +24,11 @@ export function getRoutes() {
         "path": "/video/:hash_name",
         "component": require('@/pages/VideoPlayer').default,
         "exact": true
+      },
+      {
+        "path": "/transcript/:hashName",
+        "component": require('@/pages/TranscriptPage').default,
+        "exact": true
       }
     ]
   }

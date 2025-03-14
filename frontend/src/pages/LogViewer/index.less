@@ -1,0 +1,58 @@
+.logViewerPage {
+  padding: 24px;
+  background-color: #f0f2f5;
+  min-height: calc(100vh - 48px);
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  
+  .headerTitle {
+    h2 {
+      margin-bottom: 4px;
+    }
+  }
+}
+
+.tableCard {
+  margin-bottom: 24px;
+}
+
+.tableHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.logDetails {
+  max-height: 60vh;
+  overflow-y: auto;
+  
+  .logDetailItem {
+    margin-bottom: 12px;
+    
+    strong {
+      display: inline-block;
+      width: 80px;
+      margin-right: 8px;
+    }
+  }
+  
+  .detailsJson {
+    margin-top: 8px;
+    background-color: #f5f5f5;
+    padding: 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+    
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  }
+} 

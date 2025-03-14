@@ -1,8 +1,11 @@
 import React from 'react';
-import { Menu } from 'antd';
-import { useHistory, useLocation } from 'umi';
-import { HomeOutlined, DatabaseOutlined, QuestionCircleOutlined } from '@ant-design/icons';
+import { Layout, Menu, Typography, Button } from 'antd';
+import { Link, useLocation } from 'umi';
+import { HomeOutlined, DatabaseOutlined, FileTextOutlined, BugOutlined } from '@ant-design/icons';
 import styles from './AppLayout.less';
+
+const { Header, Content, Footer } = Layout;
+const { Title } = Typography;
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -10,53 +13,50 @@ interface AppLayoutProps {
 
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const location = useLocation();
-  const history = useHistory();
   const { pathname } = location;
-  
-  const handleMenuClick = (path: string) => {
-    history.push(path);
-  };
-  
+
+  const menuItems = [
+    {
+      key: '/',
+      icon: <HomeOutlined />,
+      label: <Link to="/">首页</Link>,
+    },
+    {
+      key: '/video-data',
+      icon: <DatabaseOutlined />,
+      label: <Link to="/video-data">视频数据库</Link>,
+    },
+    {
+      key: '/logs',
+      icon: <BugOutlined />,
+      label: <Link to="/logs">日志查看</Link>,
+    },
+  ];
+
   return (
-    <div className={styles.appContainer}>
-      <div className={styles.sider}>
-        <div className={styles.topSection}>
-          <div className={styles.logo}>Yanghoovidio</div>
-          <Menu
-            mode="inline"
-            selectedKeys={[pathname === '/' ? '1' : pathname === '/video-data' ? '2' : '']}
-            className={styles.topMenu}
-            style={{ 
-              borderRight: 'none',
-              background: '#F9F9F9'
-            }}
-          >
-            <Menu.Item key="1" icon={<HomeOutlined />} onClick={() => handleMenuClick('/')}>
-              首页
-            </Menu.Item>
-            <Menu.Item key="2" icon={<DatabaseOutlined />} onClick={() => handleMenuClick('/video-data')}>
-              视频数据
-            </Menu.Item>
-          </Menu>
+    <Layout className={styles.appLayout}>
+      <Header className={styles.header}>
+        <div className={styles.logo}>
+          <Title level={3} style={{ margin: 0, color: '#fff' }}>
+            <FileTextOutlined /> Auto AI Subtitle
+          </Title>
         </div>
-        
-        <div className={styles.bottomSection}>
-          <Menu
-            mode="inline"
-            className={styles.bottomMenu}
-            style={{ 
-              borderRight: 'none',
-              background: '#F9F9F9'
-            }}
-          >
-            <Menu.Item key="3" icon={<QuestionCircleOutlined />}>帮助与支持</Menu.Item>
-          </Menu>
+        <Menu
+          theme="dark"
+          mode="horizontal"
+          selectedKeys={[pathname]}
+          items={menuItems}
+        />
+      </Header>
+      <Content className={styles.content}>
+        <div className={styles.contentWrapper}>
+          {children}
         </div>
-      </div>
-      <div className={styles.mainContent}>
-        {children}
-      </div>
-    </div>
+      </Content>
+      <Footer className={styles.footer}>
+        Auto AI Subtitle ©{new Date().getFullYear()} Created with ❤️
+      </Footer>
+    </Layout>
   );
 };
 

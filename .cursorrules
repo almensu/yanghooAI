@@ -5,7 +5,17 @@
     "buildTool": "umijs",
     "uiLibrary": "ant.design",
     "uiVersion": "4.24.8",
-    "preferredLanguage": "typescript"
+    "preferredLanguage": "typescript",
+    "logging": {
+      "enabled": true,
+      "level": "debug",
+      "storage": {
+        "localStorage": true,
+        "serverSync": true
+      },
+      "format": "[{timestamp}] [{level}] [{context}] {message}",
+      "viewerRoute": "/logs"
+    }
   },
   "backend": {
     "language": "python",
@@ -15,7 +25,20 @@
     "paths": {
       "static": "../frontend",
       "data": "../data",
-      "assets": "../frontend/assets"
+      "assets": "../frontend/assets",
+      "logs": "./logs"
+    },
+    "logging": {
+      "enabled": true,
+      "level": "INFO",
+      "handlers": ["file", "console"],
+      "fileConfig": {
+        "filename": "app_{date}.log",
+        "maxBytes": 10485760,
+        "backupCount": 10,
+        "encoding": "utf-8"
+      },
+      "format": "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
     },
     "environment": "auto_ai_subtitle-v0.0.9"
   },
@@ -48,6 +71,20 @@
           "## Dependencies Updated"
         ]
       }
+    },
+    "logging": {
+      "frontend": {
+        "errorPrefix": "[ERROR]",
+        "warnPrefix": "[WARN]",
+        "infoPrefix": "[INFO]",
+        "debugPrefix": "[DEBUG]"
+      },
+      "backend": {
+        "errorPrefix": "ERROR:",
+        "warnPrefix": "WARNING:",
+        "infoPrefix": "INFO:",
+        "debugPrefix": "DEBUG:"
+      }
     }
   },
   "testing": {
@@ -63,5 +100,12 @@
   "environment": {
     "node": "16.20.2",
     "npm": ">=6.0.0"
+  },
+  "scripts": {
+    "start": "./start.sh",
+    "start:frontend": "cd frontend && ./start.sh",
+    "start:backend": "cd backend && ./start.sh",
+    "logs:frontend": "cd frontend && npm run logs",
+    "logs:backend": "cat backend/logs/app_*.log | less"
   }
 } 
