@@ -42,4 +42,8 @@ node_modules/
 .vscode/
 .idea/
 *.sublime-project
-*.sublime-workspace 
+*.sublime-workspace
+
+# Project specific
+data/
+*.session.sql 
