@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Row, Col, Alert, Spin, message, Input, Button } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { Typography, Row, Col, Alert, Spin, message, Input, Button, Badge, Tooltip } from 'antd';
+import { ReloadOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import VideoCard from '@/components/VideoCard';
-import { getVideos, deleteVideo, addVideo, VideoDisplay, getVideoDataForHome } from '@/services/video';
+import { getVideos, deleteVideo, addVideo, VideoDisplay, getVideoDataForHome, getVideosCount } from '@/services/video';
 import styles from './index.less';
 
 const { Title } = Typography;
@@ -13,10 +13,23 @@ const HomePage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [addingVideo, setAddingVideo] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [totalVideos, setTotalVideos] = useState<number>(0);
+  const [dbMismatch, setDbMismatch] = useState<boolean>(false);
 
   useEffect(() => {
     fetchVideos();
+    fetchTotalVideos();
   }, []);
+
+  const fetchTotalVideos = async () => {
+    try {
+      const count = await getVideosCount();
+      setTotalVideos(count);
+      console.log('数据库中的视频总数:', count);
+    } catch (error) {
+      console.error('获取视频总数失败:', error);
+    }
+  };
 
   const fetchVideos = async () => {
     try {
@@ -29,6 +42,13 @@ const HomePage: React.FC = () => {
       console.log('处理后的视频数据:', data);
       
       if (data && data.length > 0) {
+        // 检查是否是模拟数据
+        const isMockData = data[0].id.startsWith('mock-');
+        if (isMockData) {
+          console.log('使用模拟数据');
+          message.warning('后端服务不可用，显示模拟数据');
+        }
+        
         // 检查缩略图
         data.forEach((video, index) => {
           console.log(`视频 ${index + 1}:`, video);
@@ -37,6 +57,16 @@ const HomePage: React.FC = () => {
         
         setVideos(data);
         console.log(`成功获取到 ${data.length} 个视频`);
+        
+        // 检查数据库中的视频数量是否与获取到的视频数量一致
+        fetchTotalVideos().then(() => {
+          if (totalVideos > 0 && totalVideos !== data.length) {
+            setDbMismatch(true);
+            console.warn(`数据库中有 ${totalVideos} 个视频，但只显示了 ${data.length} 个`);
+          } else {
+            setDbMismatch(false);
+          }
+        });
       } else {
         console.log('没有获取到视频数据');
         setError('没有找到视频数据');
@@ -158,6 +188,31 @@ const HomePage: React.FC = () => {
             loading={loading}
             style={{ marginLeft: 8 }}
           />
+        </div>
+        
+        {/* 显示视频数量信息 */}
+        <div style={{ marginBottom: 20 }}>
+          <span style={{ marginRight: 16 }}>
+            当前显示: <Badge count={videos.length} style={{ backgroundColor: '#52c41a' }} />
+          </span>
+          
+          {totalVideos > 0 && (
+            <span style={{ marginRight: 16 }}>
+              数据库总数: <Badge count={totalVideos} style={{ backgroundColor: '#1890ff' }} />
+            </span>
+          )}
+          
+          {dbMismatch && (
+            <Tooltip title={`数据库中有 ${totalVideos} 个视频，但只显示了 ${videos.length} 个。可能是分页限制或数据过滤导致的。`}>
+              <Alert
+                message={`数据不匹配: 显示 ${videos.length}/${totalVideos}`}
+                type="warning"
+                showIcon
+                icon={<InfoCircleOutlined />}
+                style={{ display: 'inline-block', marginTop: 8 }}
+              />
+            </Tooltip>
+          )}
         </div>
       </div>
       
