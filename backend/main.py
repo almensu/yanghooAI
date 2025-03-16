@@ -57,12 +57,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 在创建app后，添加静态文件挂载
-app.mount("/static", StaticFiles(directory="../frontend"), name="static")
-
 # 添加数据目录的静态文件挂载
 app.mount("/data", StaticFiles(directory="../data"), name="data")
 
+# 初始化视频处理器
 processor = VideoProcessor()
 
 # 请求模型
@@ -329,6 +327,16 @@ async def list_videos(
     videos = processor.get_videos(skip=skip, limit=limit)
     return [VideoResponse.from_db_model(v) for v in videos]
 
+@app.get("/videos/count",
+    response_model=int,
+    summary="获取视频总数",
+    description="获取数据库中所有视频的数量"
+)
+async def get_videos_count():
+    """获取视频总数"""
+    count = processor.get_videos_count()
+    return count
+
 @app.delete("/video/{hash_name}",
     response_model=dict,
     summary="删除视频",
@@ -344,12 +352,14 @@ async def delete_video(
     return {"status": "success", "message": "Video deleted successfully"}
 
 @app.get("/health",
+    response_model=dict,
     summary="健康检查",
-    description="检查服务是否正常运行"
+    description="检查API服务是否正常运行"
 )
 async def health_check():
-    """服务健康检查"""
-    return {"status": "healthy", "version": "0.0.9"}
+    """返回API服务的健康状态"""
+    api_logger.info("健康检查")
+    return {"status": "ok", "message": "API service is running"}
 
 @app.get("/video/{hash_name}/files/{file_type}",
     summary="下载视频相关文件",
@@ -380,15 +390,6 @@ async def download_file(
         filename=os.path.basename(file_path),
         media_type="application/octet-stream"
     )
-
-# 添加根路径路由
-@app.get("/")
-async def read_index():
-    return FileResponse("frontend/index.html")
-
-@app.get("/video.html")
-async def read_video():
-    return FileResponse("frontend/video.html")
 
 # 添加静态文件直接访问路由
 @app.get("/app.js")
@@ -533,6 +534,25 @@ async def get_video_subtitles(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取字幕失败: {str(e)}")
 
+@app.get("/api/video/data", 
+    response_model=List[dict],
+    summary="获取原始视频数据 (API路径)",
+    description="获取数据库中的原始视频数据 (API路径)"
+)
+async def get_api_video_data(
+    skip: int = Query(0, description="跳过的记录数"),
+    limit: int = Query(100, description="返回的记录数")
+):
+    """获取数据库中的原始视频数据 (API路径)"""
+    api_logger.info(f"请求获取视频数据 (API路径): skip={skip}, limit={limit}")
+    try:
+        result = await get_video_data(skip, limit)
+        api_logger.info(f"成功获取视频数据 (API路径): {len(result)}条记录")
+        return result
+    except Exception as e:
+        api_logger.error(f"获取视频数据失败 (API路径): {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取视频数据失败: {str(e)}")
+
 @app.get("/video/data", 
     response_model=List[dict],
     summary="获取原始视频数据",
@@ -543,12 +563,15 @@ async def get_video_data(
     limit: int = Query(100, description="返回的记录数")
 ):
     """获取数据库中的原始视频数据"""
+    api_logger.info(f"请求获取视频数据: skip={skip}, limit={limit}")
     from sqlalchemy.orm import Session
     from models.database import SessionLocal, Video
     
     db = SessionLocal()
     try:
         videos = db.query(Video).offset(skip).limit(limit).all()
+        api_logger.info(f"成功查询到{len(videos)}条视频记录")
+        
         # 将 SQLAlchemy 模型转换为字典
         result = []
         for video in videos:
@@ -570,7 +593,12 @@ async def get_video_data(
                 "created_at": video.created_at.isoformat() if video.created_at else None
             }
             result.append(video_dict)
+        
+        api_logger.info(f"成功返回{len(result)}条视频数据")
         return result
+    except Exception as e:
+        api_logger.error(f"获取视频数据失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取视频数据失败: {str(e)}")
     finally:
         db.close()
 
@@ -808,3 +836,28 @@ async def receive_frontend_logs(log: FrontendLog = Body(...)):
     except Exception as e:
         app_logger.error(f"处理前端日志失败: {str(e)}", exc_info=True)
         return {"status": "error", "message": str(e)}
+
+# 添加根路径端点
+@app.get("/", 
+    response_model=dict,
+    summary="API根路径",
+    description="API服务的根路径"
+)
+async def root():
+    """返回API服务的根路径信息"""
+    api_logger.info("访问API根路径")
+    return {
+        "name": "Auto AI Subtitle API",
+        "version": "0.0.9",
+        "status": "running"
+    }
+
+@app.get("/api/health",
+    response_model=dict,
+    summary="健康检查 (API路径)",
+    description="检查API服务是否正常运行 (API路径)"
+)
+async def api_health_check():
+    """返回API服务的健康状态 (API路径)"""
+    api_logger.info("健康检查 (API路径)")
+    return {"status": "ok", "message": "API service is running"}
