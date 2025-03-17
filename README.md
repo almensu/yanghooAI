@@ -39,7 +39,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate  # 在Windows上使用: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --reload
+cd backend && uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 ## 部署
@@ -61,7 +61,7 @@ cd backend
 pip install fastapi uvicorn python-multipart pillow sqlalchemy
 
 # 启动服务器
-uvicorn main:app --host 0.0.0.0 --port 8000
+cd backend && uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
 ### 使用conda环境

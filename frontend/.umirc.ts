@@ -35,29 +35,16 @@ export default defineConfig({
   ],
   proxy: {
     '/api': {
-      target: 'http://localhost:8001',
+      target: 'http://localhost:8000',
       changeOrigin: true,
       pathRewrite: { '^/api': '' },
-    },
-    '/videos': {
-      target: 'http://localhost:8001',
-      changeOrigin: true,
-    },
-    '/video': {
-      target: 'http://localhost:8001',
-      changeOrigin: true,
-    },
-    '/data': {
-      target: 'http://localhost:8001',
-      changeOrigin: true,
-    },
-    '/file': {
-      target: 'http://localhost:8001',
-      changeOrigin: true,
-    },
-    '/health': {
-      target: 'http://localhost:8001',
-      changeOrigin: true,
+      onError: (err, req, res) => {
+        console.log('代理请求错误:', err);
+        res.writeHead(500, {
+          'Content-Type': 'application/json',
+        });
+        res.end(JSON.stringify({ error: '后端服务未启动或无法访问' }));
+      },
     },
   },
 }); 

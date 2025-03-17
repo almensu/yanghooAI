@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Row, Col, Alert, Spin, message, Input, Button, Badge, Tooltip } from 'antd';
+import { Typography, Row, Col, Alert, Spin, message, Input, Button, Badge, Tooltip, Divider, Card, Statistic } from 'antd';
 import { ReloadOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import VideoCard from '@/components/VideoCard';
 import { getVideos, deleteVideo, addVideo, VideoDisplay, getVideoDataForHome, getVideosCount } from '@/services/video';
@@ -7,6 +7,31 @@ import styles from './index.less';
 
 const { Title } = Typography;
 const { Search } = Input;
+
+const HeaderInfo: React.FC<{ totalVideos: number; dbMismatch: boolean; videos: VideoDisplay[] }> = ({
+  totalVideos,
+  dbMismatch,
+  videos,
+}) => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+    <div>
+      <Statistic title="视频总数" value={totalVideos} />
+      <Statistic 
+        title="已加载" 
+        value={videos.length} 
+        style={{ marginLeft: 32 }}
+      />
+    </div>
+    {dbMismatch && (
+      <Alert
+        type="warning"
+        message={`数据库中有 ${totalVideos} 个视频，但只显示了 ${videos.length} 个`}
+        showIcon
+        icon={<InfoCircleOutlined />}
+      />
+    )}
+  </div>
+);
 
 const HomePage: React.FC = () => {
   const [videos, setVideos] = useState<VideoDisplay[]>([]);
@@ -43,7 +68,7 @@ const HomePage: React.FC = () => {
       
       if (data && data.length > 0) {
         // 检查是否是模拟数据
-        const isMockData = data[0].id.startsWith('mock-');
+        const isMockData = data[0].id.toString().startsWith('mock-');
         if (isMockData) {
           console.log('使用模拟数据');
           message.warning('后端服务不可用，显示模拟数据');
@@ -59,14 +84,15 @@ const HomePage: React.FC = () => {
         console.log(`成功获取到 ${data.length} 个视频`);
         
         // 检查数据库中的视频数量是否与获取到的视频数量一致
-        fetchTotalVideos().then(() => {
-          if (totalVideos > 0 && totalVideos !== data.length) {
-            setDbMismatch(true);
-            console.warn(`数据库中有 ${totalVideos} 个视频，但只显示了 ${data.length} 个`);
-          } else {
-            setDbMismatch(false);
-          }
-        });
+        const count = await getVideosCount();
+        setTotalVideos(count);
+        
+        if (count > 0 && count !== data.length) {
+          setDbMismatch(true);
+          console.warn(`数据库中有 ${count} 个视频，但只显示了 ${data.length} 个`);
+        } else {
+          setDbMismatch(false);
+        }
       } else {
         console.log('没有获取到视频数据');
         setError('没有找到视频数据');
@@ -128,43 +154,6 @@ const HomePage: React.FC = () => {
     }
   };
 
-  const renderVideoCards = () => {
-    if (videos.length === 0) {
-      return (
-        <div className={styles.emptyState}>
-          <Alert
-            message="暂无视频"
-            description="添加视频链接开始使用"
-            type="info"
-            showIcon
-          />
-        </div>
-      );
-    }
-
-    return (
-      <Row gutter={[24, 24]}>
-        {videos.map(video => {
-          console.log(`渲染视频卡 ${video.id}:`, video);
-          return (
-            <Col xs={24} sm={12} md={8} lg={6} key={video.id}>
-              <VideoCard
-                title={video.title}
-                description={video.description}
-                time={video.time}
-                timestamp={video.timestamp}
-                source={video.source}
-                thumbnail={video.thumbnail}
-                hash_name={video.hash_name}
-                onDelete={() => handleDelete(video.id, video.hash_name)}
-              />
-            </Col>
-          );
-        })}
-      </Row>
-    );
-  };
-
   return (
     <div className={styles.homePage}>
       <div className={styles.welcomeContainer}>
@@ -189,48 +178,58 @@ const HomePage: React.FC = () => {
             style={{ marginLeft: 8 }}
           />
         </div>
-        
-        {/* 显示视频数量信息 */}
-        <div style={{ marginBottom: 20 }}>
-          <span style={{ marginRight: 16 }}>
-            当前显示: <Badge count={videos.length} style={{ backgroundColor: '#52c41a' }} />
-          </span>
-          
-          {totalVideos > 0 && (
-            <span style={{ marginRight: 16 }}>
-              数据库总数: <Badge count={totalVideos} style={{ backgroundColor: '#1890ff' }} />
-            </span>
-          )}
-          
-          {dbMismatch && (
-            <Tooltip title={`数据库中有 ${totalVideos} 个视频，但只显示了 ${videos.length} 个。可能是分页限制或数据过滤导致的。`}>
-              <Alert
-                message={`数据不匹配: 显示 ${videos.length}/${totalVideos}`}
-                type="warning"
-                showIcon
-                icon={<InfoCircleOutlined />}
-                style={{ display: 'inline-block', marginTop: 8 }}
-              />
-            </Tooltip>
-          )}
-        </div>
       </div>
+
+      <Divider />
+
+      <HeaderInfo totalVideos={totalVideos} dbMismatch={dbMismatch} videos={videos} />
       
       <div className={styles.videoGrid}>
         {loading ? (
-          <div className={styles.loadingContainer}>
+          <div className={styles.stateContainer}>
             <Spin size="large" />
+            <div className={styles.stateText}>加载中...</div>
           </div>
         ) : error ? (
-          <div className={styles.emptyState}>
+          <div className={styles.stateContainer}>
             <Alert
-              message="获取数据出错"
+              message="Error"
               description={error}
               type="error"
               showIcon
             />
           </div>
-        ) : renderVideoCards()}
+        ) : videos.length === 0 ? (
+          <div className={styles.stateContainer}>
+            <Alert
+              message="暂无视频"
+              description="添加视频链接开始使用"
+              type="info"
+              showIcon
+            />
+          </div>
+        ) : (
+          <Row gutter={[24, 24]}>
+            {videos.map(video => (
+              <Col xs={24} sm={12} md={8} lg={6} key={video.id}>
+                <Card
+                  hoverable
+                  cover={<img alt={video.title} src={video.thumbnail} />}
+                >
+                  <Card.Meta
+                    title={video.title}
+                    description={video.description}
+                  />
+                  <div className={styles.videoMeta}>
+                    <span>{video.time}</span>
+                    <span>{video.timestamp}</span>
+                    <span>{video.source}</span>
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        )}
       </div>
     </div>
   );

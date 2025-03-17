@@ -5,24 +5,28 @@ import { zhCN } from 'date-fns/locale';
 import logger from '@/utils/logger';
 
 // API基础URL
-export const API_BASE_URL = 'http://localhost:8001';
+export const API_BASE_URL = 'http://localhost:8000';
 
 // 检查后端服务是否可用
 async function checkBackendStatus(): Promise<boolean> {
   try {
     // 尝试多个端点
     const endpoints = [
-      'http://localhost:8001/health',
-      'http://localhost:8001/',
-      '/health',
-      '/'
+      '/api/health',
+      '/api/',
+      'http://localhost:8000/health',
+      'http://localhost:8000/'
     ];
     
     for (const endpoint of endpoints) {
       try {
         console.log(`尝试访问端点: ${endpoint}`);
-        const response = await axios.get(endpoint, { timeout: 3000 });
-        if (response.status === 200) {
+        const response = await fetch(endpoint, { 
+          method: 'GET',
+          headers: { 'Accept': 'application/json' }
+        });
+        
+        if (response.ok) {
           console.log(`端点 ${endpoint} 可用`);
           return true;
         }
@@ -215,79 +219,71 @@ export async function deleteVideo(hash_name: string): Promise<boolean> {
 /**
  * 获取视频数据
  */
-export async function getVideoData(): Promise<any[]> {
+export async function getVideoData() {
   try {
-    logger.info('获取视频数据');
     console.log('开始获取视频数据...');
     
-    // 尝试直接访问/video/data端点
-    try {
-      console.log('尝试访问/video/data端点...');
-      const response = await axios.get(`${API_BASE_URL}/video/data`, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 5000
-      });
-      
-      logger.info('获取视频数据成功', { count: response.data.length });
-      console.log('成功从/video/data获取数据:', response.data.length);
-      return response.data;
-    } catch (directError) {
-      console.error('直接访问/video/data失败:', directError);
-      
-      // 尝试通过API前缀访问
+    // 尝试多个可能的API端点，修改端口为8000
+    const endpoints = [
+      '/api/videos',
+      'http://localhost:8000/videos',
+      '/api/video/list',
+      'http://localhost:8000/video/list'
+    ];
+    
+    let response = null;
+    let errorMessages = [];
+    
+    for (const endpoint of endpoints) {
       try {
-        console.log('尝试访问/api/video/data端点...');
-        const apiResponse = await axios.get(`${API_BASE_URL}/api/video/data`, {
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 5000
-        });
+        console.log(`尝试从 ${endpoint} 获取数据...`);
+        const resp = await fetch(endpoint);
         
-        logger.info('通过API前缀获取视频数据成功', { count: apiResponse.data.length });
-        console.log('成功从/api/video/data获取数据:', apiResponse.data.length);
-        return apiResponse.data;
-      } catch (apiError) {
-        console.error('通过API前缀访问/video/data失败:', apiError);
-        
-        // 尝试使用相对路径
-        try {
-          console.log('尝试使用相对路径访问/video/data...');
-          const relativeResponse = await axios.get(`/video/data`, {
-            headers: { 'Content-Type': 'application/json' },
-            timeout: 5000
-          });
-          
-          logger.info('通过相对路径获取视频数据成功', { count: relativeResponse.data.length });
-          console.log('成功通过相对路径获取数据:', relativeResponse.data.length);
-          return relativeResponse.data;
-        } catch (relativeError) {
-          console.error('通过相对路径访问/video/data失败:', relativeError);
-          
-          // 最后尝试使用相对路径访问API前缀
-          try {
-            console.log('尝试使用相对路径访问/api/video/data...');
-            const relativeApiResponse = await axios.get(`/api/video/data`, {
-              headers: { 'Content-Type': 'application/json' },
-              timeout: 5000
-            });
-            
-            logger.info('通过相对路径API前缀获取视频数据成功', { count: relativeApiResponse.data.length });
-            console.log('成功通过相对路径API前缀获取数据:', relativeApiResponse.data.length);
-            return relativeApiResponse.data;
-          } catch (relativeApiError) {
-            console.error('通过相对路径API前缀访问/video/data失败:', relativeApiError);
-            throw relativeApiError;
-          }
+        if (resp.ok) {
+          console.log(`成功从 ${endpoint} 获取响应`);
+          response = resp;
+          break;
+        } else {
+          const errorText = await resp.text();
+          errorMessages.push(`${endpoint}: ${resp.status} - ${errorText}`);
+          console.error(`从 ${endpoint} 获取数据失败:`, resp.status, errorText);
         }
+      } catch (endpointError: any) {
+        errorMessages.push(`${endpoint}: ${endpointError.message}`);
+        console.error(`访问 ${endpoint} 出错:`, endpointError);
+      }
+    }
+    
+    if (!response) {
+      throw new Error(`所有API端点都失败: ${errorMessages.join('; ')}`);
+    }
+    
+    const contentType = response.headers.get('content-type');
+    console.log('响应Content-Type:', contentType);
+    
+    if (contentType && contentType.includes('application/json')) {
+      const jsonData = await response.json();
+      console.log('解析的JSON数据:', jsonData);
+      return jsonData;
+    } else {
+      // 处理非JSON响应
+      const text = await response.text();
+      console.log('非JSON响应内容:', text.substring(0, 200) + '...');
+      
+      try {
+        // 尝试解析为JSON
+        const parsedData = JSON.parse(text);
+        console.log('成功将文本解析为JSON:', parsedData);
+        return parsedData;
+      } catch (e) {
+        // 如果无法解析，返回原始文本
+        console.warn('后端返回非JSON数据，无法解析');
+        return text;
       }
     }
   } catch (error) {
-    logger.error('获取视频数据失败', { error });
-    console.error('所有尝试都失败，使用模拟数据替代');
-    // 出错时返回模拟数据
-    return generateMockVideos().map(video => ({
-      ...video,
-      id: parseInt(video.id.replace('mock-', '')) || Math.floor(Math.random() * 1000)
-    }));
+    console.error('获取视频数据出错:', error);
+    throw error;
   }
 }
 
@@ -395,117 +391,95 @@ export async function addVideo(url: string): Promise<VideoDisplay | null> {
 export const getVideoDataForHome = async (): Promise<VideoDisplay[]> => {
   try {
     // 检查后端服务是否可用
-    const isBackendAvailable = await checkBackendStatus();
-    if (!isBackendAvailable) {
-      console.error('后端服务不可用，返回模拟数据');
-      return generateMockVideos();
-    }
+    console.log('开始获取视频数据...');
     
     // 直接尝试多个端点获取视频数据
     let response;
     try {
-      // 尝试直接获取视频列表
-      console.log('尝试从/videos端点获取视频数据');
-      response = await axios.get('http://localhost:8001/videos', {
-        params: { skip: 0, limit: 1000 }
-      });
-      console.log('成功从/videos端点获取数据');
-    } catch (err1) {
-      console.error('从/videos端点获取数据失败:', err1);
-      try {
-        // 尝试从video/data端点获取
-        console.log('尝试从/video/data端点获取视频数据');
-        response = await axios.get('http://localhost:8001/video/data', {
-          params: { skip: 0, limit: 1000 }
-        });
-        console.log('成功从/video/data端点获取数据');
-      } catch (err2) {
-        console.error('从/video/data端点获取数据失败:', err2);
-        console.log('所有尝试都失败，返回模拟数据');
+      // 尝试使用代理路径
+      console.log('尝试从/api/videos端点获取视频数据');
+      response = await fetch('/api/videos');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      console.log('成功从/api/videos端点获取数据');
+      const data = await response.json();
+      console.log('获取到的数据:', data);
+      
+      // 处理数据...
+      if (!data || !Array.isArray(data)) {
+        console.error('API返回的数据格式不正确:', data);
         return generateMockVideos();
       }
-    }
-    
-    console.log('从API获取的原始视频数据:', response.data);
-    console.log('视频数量:', response.data.length);
-    
-    if (!response.data || !Array.isArray(response.data)) {
-      console.error('API返回的数据格式不正确:', response.data);
+      
+      return data.map((video: any) => {
+        try {
+          console.log('处理视频数据:', video);
+          
+          // 处理缩略图URL
+          let thumbnailUrl = '';
+          
+          // 首先检查是否有pic_thumb_path
+          if (video.pic_thumb_path) {
+            thumbnailUrl = `/api${video.pic_thumb_path}`;
+            console.log('使用pic_thumb_path作为缩略图:', thumbnailUrl);
+          } 
+          // 然后检查是否有files.thumbnail
+          else if (video.files && video.files.thumbnail) {
+            thumbnailUrl = `/api${video.files.thumbnail}`;
+            console.log('使用files.thumbnail作为缩略图:', thumbnailUrl);
+          } 
+          // 最后使用hash_name构建缩略图URL
+          else if (video.hash_name) {
+            thumbnailUrl = `/api/video/${video.hash_name}/thumbnail`;
+            console.log('使用hash_name构建缩略图URL:', thumbnailUrl);
+          }
+          
+          // 格式化日期
+          let formattedDate = '未知日期';
+          let formattedTime = '--:--';
+          
+          if (video.created_at) {
+            try {
+              const date = new Date(video.created_at);
+              formattedDate = formatRelativeTime(date);
+              formattedTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+            } catch (dateError) {
+              console.error('日期格式化错误:', dateError);
+            }
+          }
+          
+          return {
+            id: String(video.id) || String(Math.random()),
+            title: video.title || '未命名视频',
+            description: video.status || '无状态信息',
+            thumbnail: thumbnailUrl,
+            time: formattedDate,
+            timestamp: formattedTime,
+            source: getVideoSource(video.url || ''),
+            hash_name: video.hash_name || '',
+          };
+        } catch (itemError) {
+          console.error('处理单个视频数据时出错:', itemError, video);
+          return {
+            id: String(Math.random()),
+            title: video.title || '数据处理错误',
+            description: '视频数据处理过程中出现错误',
+            thumbnail: '',
+            time: '未知日期',
+            timestamp: '--:--',
+            source: '本地上传',
+            hash_name: video.hash_name || '',
+          };
+        }
+      });
+      
+    } catch (err) {
+      console.error('获取视频数据失败:', err);
       return generateMockVideos();
     }
-    
-    if (response.data.length === 0) {
-      console.log('API返回空数组，没有视频数据');
-      return [];
-    }
-    
-    return response.data.map((video: any) => {
-      try {
-        console.log('处理视频数据:', video);
-        
-        // 处理缩略图URL
-        let thumbnailUrl = '';
-        const backendUrl = 'http://localhost:8001'; // 使用实际运行的端口
-        
-        // 首先检查是否有pic_thumb_path
-        if (video.pic_thumb_path) {
-          thumbnailUrl = `${backendUrl}${video.pic_thumb_path}`;
-          console.log('使用pic_thumb_path作为缩略图:', thumbnailUrl);
-        } 
-        // 然后检查是否有files.thumbnail
-        else if (video.files && video.files.thumbnail) {
-          thumbnailUrl = video.files.thumbnail;
-          console.log('使用files.thumbnail作为缩略图:', thumbnailUrl);
-          
-          // 确保URL是完整的
-          if (thumbnailUrl.startsWith('/file/')) {
-            thumbnailUrl = `${backendUrl}${thumbnailUrl}`;
-          }
-        } 
-        // 最后使用hash_name构建缩略图URL
-        else if (video.hash_name) {
-          thumbnailUrl = `${backendUrl}/video/${video.hash_name}/thumbnail`;
-          console.log('使用hash_name构建缩略图URL:', thumbnailUrl);
-        }
-        
-        // 格式化日期
-        let formattedDate = '未知日期';
-        let formattedTime = '--:--';
-        
-        if (video.created_at) {
-          try {
-            const date = new Date(video.created_at);
-            formattedDate = formatRelativeTime(date);
-            formattedTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-          } catch (dateError) {
-            console.error('日期格式化错误:', dateError);
-          }
-        }
-        
-        return {
-          id: String(video.id) || String(Math.random()),
-          title: video.title || '未命名视频',
-          description: video.status || '无状态信息',
-          thumbnail: thumbnailUrl,
-          time: formattedDate,
-          timestamp: formattedTime,
-          source: getVideoSource(video.url || ''),
-          hash_name: video.hash_name || '',
-        };
-      } catch (itemError) {
-        console.error('处理单个视频数据时出错:', itemError, video);
-        return {
-          id: String(Math.random()),
-          title: video.title || '数据处理错误',
-          description: '视频数据处理过程中出现错误',
-          thumbnail: '',
-          time: '未知日期',
-          timestamp: '--:--',
-          source: '本地上传',
-          hash_name: video.hash_name || '',
-        };
-      }
-    });
   } catch (error) {
     console.error('获取视频数据时出错:', error);
     // 返回模拟数据作为后备
@@ -531,27 +505,44 @@ export async function getVideoByHash(hash_name: string): Promise<Video | null> {
  */
 export async function getVideosCount(): Promise<number> {
   try {
-    logger.info('获取视频总数');
+    console.log('获取视频总数');
     
     // 尝试从API获取数据
     try {
-      const response = await axios.get(`${API_BASE_URL}/videos/count`);
-      logger.info('获取视频总数成功', { count: response.data });
-      return response.data;
-    } catch (apiError) {
-      logger.error('获取视频总数失败', { error: apiError });
-      // 如果获取失败，尝试使用相对路径
-      try {
-        const response = await axios.get('/videos/count');
-        logger.info('通过相对路径获取视频总数成功', { count: response.data });
-        return response.data;
-      } catch (relativeError) {
-        logger.error('通过相对路径获取视频总数失败', { error: relativeError });
-        return 0;
+      const response = await fetch('/api/videos/count');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      
+      const data = await response.json();
+      console.log('获取视频总数成功', { count: data });
+      return typeof data === 'number' ? data : 0;
+    } catch (apiError) {
+      console.error('获取视频总数失败', apiError);
+      return 0;
     }
   } catch (error) {
-    logger.error('获取视频总数失败', { error });
+    console.error('获取视频总数失败', error);
     return 0;
+  }
+}
+
+// 添加数据库检查函数
+export async function checkDatabaseConsistency() {
+  try {
+    console.log('检查数据库与本地文件一致性...');
+    const response = await fetch('/api/check-database');
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('数据库检查结果:', data);
+    return data;
+  } catch (error) {
+    console.error('数据库检查失败:', error);
+    throw error;
   }
 } 

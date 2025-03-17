@@ -26,6 +26,10 @@ class VideoProcessor:
         """获取视频列表，支持分页"""
         return self.db.query(Video).offset(skip).limit(limit).all()
         
+    def get_videos_count(self) -> int:
+        """获取视频总数"""
+        return self.db.query(Video).count()
+        
     def delete_video(self, hash_name: str) -> bool:
         """删除视频及其相关文件"""
         try:

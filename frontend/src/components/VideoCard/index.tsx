@@ -48,38 +48,12 @@ const VideoCard: React.FC<VideoCardProps> = ({
     if (thumbnail) {
       console.log('VideoCard 收到缩略图URL:', thumbnail);
       
-      // 尝试修复缩略图URL
-      let fixedThumbnail = thumbnail;
-      
-      if (thumbnail.startsWith('/file/')) {
-        // 如果是/file/开头，添加API前缀
-        fixedThumbnail = `http://localhost:8000${thumbnail}`;
-        console.log('修正后的缩略图URL:', fixedThumbnail);
-      } else if (thumbnail.startsWith('/api/file/')) {
-        // 如果是/api/file/开头，替换为正确的URL
-        fixedThumbnail = `http://localhost:8000${thumbnail.replace('/api/file/', '/file/')}`;
-        console.log('修正后的缩略图URL:', fixedThumbnail);
-      }
-      
-      // 测试图片是否可以加载
-      const img = new globalThis.Image();
-      img.onload = () => {
-        console.log('缩略图加载成功:', fixedThumbnail);
-        setImageLoaded(true);
-        setImageError(false);
-        
-        // 如果URL被修正了，更新组件状态
-        if (fixedThumbnail !== thumbnail) {
-          setFixedThumbnailUrl(fixedThumbnail);
-        }
-      };
-      img.onerror = (e) => {
-        console.error('缩略图加载失败:', fixedThumbnail, e);
-        setImageError(true);
-      };
-      img.src = fixedThumbnail;
+      // 简化缩略图处理逻辑，直接使用占位符
+      setImageError(true);
+      console.log('使用占位符替代缩略图');
     } else {
       console.log('VideoCard 没有收到缩略图URL');
+      setImageError(true);
     }
   }, [thumbnail]);
   
@@ -95,28 +69,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
   
   // 使用 Ant Design 的 Image 组件
   const renderThumbnail = () => {
-    // 使用修正后的URL或原始URL
-    const displayThumbnail = fixedThumbnailUrl || thumbnail;
-    
-    if (displayThumbnail && !imageError) {
-      return (
-        <div className={styles.thumbnailWrapper}>
-          <Image
-            src={displayThumbnail}
-            alt={title}
-            className={styles.thumbnailImage}
-            preview={false}
-            onError={(e) => {
-              console.error('图片加载错误，使用背景色替代:', displayThumbnail);
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              target.parentElement!.style.backgroundColor = backgroundColor;
-            }}
-          />
-        </div>
-      );
-    }
-    
+    // 始终使用占位符，避免网络错误
     return (
       <div 
         className={styles.thumbnailPlaceholder} 

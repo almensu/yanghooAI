@@ -12,22 +12,27 @@ export function getRoutes() {
     "routes": [
       {
         "path": "/",
-        "component": require('@/pages/Home').default,
+        "component": require('@/pages/Home/index').default,
         "exact": true
       },
       {
         "path": "/video-data",
-        "component": require('@/pages/VideoData').default,
+        "component": require('@/pages/VideoData/index').default,
         "exact": true
       },
       {
         "path": "/video/:hash_name",
-        "component": require('@/pages/VideoPlayer').default,
+        "component": require('@/pages/VideoPlayer/index').default,
         "exact": true
       },
       {
-        "path": "/transcript/:hashName",
-        "component": require('@/pages/TranscriptPage').default,
+        "path": "/transcript/:hash_name",
+        "component": require('@/pages/TranscriptPage/index').default,
+        "exact": true
+      },
+      {
+        "path": "/logs",
+        "component": require('@/pages/LogViewer/index').default,
         "exact": true
       }
     ]

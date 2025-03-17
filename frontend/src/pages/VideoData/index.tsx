@@ -1,59 +1,57 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Typography, Card, Spin, Alert, Button, Space, Input, Popconfirm, message, Tooltip, Modal, Image } from 'antd';
+import { Table, Typography, Card, Spin, Alert, Button, Space, Input, Popconfirm, message, Tooltip, Modal, Image, Tag } from 'antd';
+import type { ColumnType } from 'antd/es/table';
 
 import { ReloadOutlined, DatabaseOutlined, SearchOutlined, EyeOutlined, DeleteOutlined, FileImageOutlined, FileTextOutlined } from '@ant-design/icons';
-import { getVideoData, deleteVideo, getOriginalTranscript } from '@/services/video';
+import { ReloadOutlined as ReloadOutlinedIcon } from '@ant-design/icons';
+import { getVideoData, deleteVideo, getOriginalTranscript, checkDatabaseConsistency } from '@/services/video';
 import styles from './index.less';
 
 const { Title } = Typography;
 const { Search } = Input;
 
-// 处理文件路径，确保能正确访问
-const getFileUrl = (path: string | undefined): string => {
-  if (!path) return '';
-  
-  // 记录原始路径
-  console.log('处理文件路径:', path);
-  
-  let result = path;
-  
-  if (path.startsWith('/file/')) {
-    result = `/api${path}`;
-  } else if (path.startsWith('data/')) {
-    result = `/api/file/${path}`;
-  } else if (!path.startsWith('http') && !path.startsWith('/')) {
-    result = `/api/file/${path}`;
-  }
-  
-  console.log('处理后的路径:', result);
-  return result;
-};
+interface Window {
+  mockVideoData?: VideoData[];
+}
 
 interface VideoData {
+  // 数据库基本字段
   id: number;
   title: string;
   url: string;
   hash_name: string;
+  folder_hash_name_path: string;
   created_at: string;
-  file_path: string;
-  subtitle_en_json_path?: string;
-  subtitle_en_ass_path?: string;
-  subtitle_zh_cn_json_path?: string;
-  subtitle_zh_cn_ass_path?: string;
-  folder_hash_name_path?: string;
-  has_original_transcript?: boolean;
+  status: string;
+  last_synced_at?: string;
+
+  // 文件路径字段（与本地文件夹结构对应）
+  file_path: string;                         // /data/{hash}/original/video.mp4
+  pic_thumb_path: string;                    // /data/{hash}/original/thumbnail.jpg
+  wav_path: string;                          // /data/{hash}/original/audio.wav
+  subtitle_en_json_path: string;             // /data/{hash}/subtitles/en.json
+  subtitle_zh_cn_json_path: string;          // /data/{hash}/subtitles/zh.json
+  subtitle_en_ass_path: string;              // /data/{hash}/subtitles/en.ass
+  subtitle_zh_cn_ass_path: string;           // /data/{hash}/subtitles/bilingual.ass
+  subtitle_en_md_path: string;               // /data/{hash}/docs/en.md
+  subtitle_zh_cn_md_path: string;            // /data/{hash}/docs/zh.md
+  subtitle_en_with_words_json_path: string;  // /data/{hash}/subtitles/whisperx.json
+
+  // 前端展示用的文件结构（基于本地文件夹组织）
   files?: {
-    subtitles?: {
-      en_json?: string;
-      zh_json?: string;
-      en_ass?: string;
-      zh_ass?: string;
-      ass?: string;
-      en_md?: string;
-      zh_md?: string;
+    video: string;      // original/video.mp4
+    thumbnail: string;  // original/thumbnail.jpg
+    wav: string;        // original/audio.wav
+    subtitles: {
+      en_json: string;          // subtitles/en.json
+      zh_json: string;          // subtitles/zh.json
+      en_ass: string;           // subtitles/en.ass
+      zh_ass: string;           // subtitles/bilingual.ass
+      en_md: string;            // docs/en.md
+      zh_md: string;            // docs/zh.md
+      en_with_words: string;    // subtitles/whisperx.json
     };
   };
-  [key: string]: any;
 }
 
 // 检查是否有原始转写文件
@@ -68,12 +66,46 @@ const hasOriginalTranscript = (record: VideoData): boolean => {
     return true;
   }
   
-  // 检查后端提供的标志
-  if (record.has_original_transcript) {
-    return true;
+  return false;
+};
+
+// 修改 getFileUrl 函数，确保正确处理文件路径
+const getFileUrl = (hash_name: string, type?: string): string => {
+  if (!hash_name) return '';
+  
+  // 使用一致的API基础URL
+  const baseUrl = '/api';
+  
+  // 添加调试日志
+  console.log(`构建文件URL: hash_name=${hash_name}, type=${type}`);
+  
+  let url = '';
+  switch (type) {
+    case 'en_json':
+      url = `${baseUrl}/video/${hash_name}/subtitle/en.json`;
+      break;
+    case 'zh_json':
+      url = `${baseUrl}/video/${hash_name}/subtitle/zh.json`;
+      break;
+    case 'bilingual_ass':
+      url = `${baseUrl}/video/${hash_name}/subtitle/bilingual.ass`;
+      break;
+    case 'whisperx':
+      url = `${baseUrl}/video/${hash_name}/subtitle/whisperx.json`;
+      break;
+    case 'wav':
+      url = `${baseUrl}/video/${hash_name}/audio`;
+      break;
+    case 'thumbnail':
+      // 尝试直接使用hash_name构建缩略图URL
+      url = `${baseUrl}/video/${hash_name}/thumbnail`;
+      break;
+    default:
+      url = `${baseUrl}/video/${hash_name}`;
   }
   
-  return false;
+  console.log(`生成的URL: ${url}`);
+  return url;
 };
 
 const VideoDataPage: React.FC = () => {
@@ -89,13 +121,150 @@ const VideoDataPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getVideoData();
-      console.log('获取到的视频数据:', data);
-      setVideoData(data);
-      setFilteredData(data);
+      // 获取视频数据
+      console.log('获取视频数据...');
+      const response = await getVideoData();
+      console.log('获取到的视频数据类型:', typeof response);
+      console.log('获取到的视频数据:', response);
+      
+      // 更健壮的数据验证
+      if (!response) {
+        throw new Error('未获取到数据');
+      }
+      
+      // 处理可能是字符串的情况
+      let data: any = response;
+      if (typeof response === 'string') {
+        try {
+          data = JSON.parse(response);
+          console.log('解析字符串后的数据:', data);
+        } catch (e) {
+          console.error('解析返回的字符串失败:', e);
+          throw new Error('返回的数据格式不正确: 无法解析JSON字符串');
+        }
+      }
+      
+      // 确保 data 是数组
+      let validData: VideoData[] = [];
+      
+      if (Array.isArray(data)) {
+        validData = data;
+        console.log('数据是数组格式');
+      } else if (data && typeof data === 'object') {
+        console.log('数据是对象格式，尝试提取数组');
+        // 尝试从对象中提取数组
+        if (Array.isArray(data.data)) {
+          validData = data.data;
+          console.log('从data字段提取数组成功');
+        } else if (Array.isArray(data.videos)) {
+          validData = data.videos;
+          console.log('从videos字段提取数组成功');
+        } else if (Array.isArray(data.items)) {
+          validData = data.items;
+          console.log('从items字段提取数组成功');
+        } else if (Array.isArray(data.results)) {
+          validData = data.results;
+          console.log('从results字段提取数组成功');
+        } else {
+          // 如果是单个对象，尝试转换为数组
+          if (data.id !== undefined && data.title !== undefined) {
+            validData = [data as VideoData];
+            console.log('将单个对象转换为数组');
+          } else {
+            console.error('无法从对象中提取数组:', data);
+            throw new Error('返回的数据格式不正确: 无法提取视频数组');
+          }
+        }
+      } else {
+        console.error('数据格式不是对象也不是数组:', typeof data);
+        throw new Error(`返回的数据格式不正确: ${typeof data}`);
+      }
+      
+      // 确保每个项目都有必要的字段
+      const processedData = validData.map((item, index) => {
+        console.log(`处理视频数据项 ${index}:`, item);
+        
+        return {
+          id: item.id || index + 1,
+          title: item.title || `未命名视频 ${index + 1}`,
+          url: item.url || '',
+          hash_name: item.hash_name || `video-${index + 1}`,
+          folder_hash_name_path: item.folder_hash_name_path || '',
+          created_at: item.created_at || new Date().toISOString(),
+          status: item.status || 'pending',
+          file_path: item.file_path || '',
+          pic_thumb_path: item.pic_thumb_path || '',
+          wav_path: item.wav_path || '',
+          subtitle_en_json_path: item.subtitle_en_json_path || '',
+          subtitle_zh_cn_json_path: item.subtitle_zh_cn_json_path || '',
+          subtitle_en_ass_path: item.subtitle_en_ass_path || '',
+          subtitle_zh_cn_ass_path: item.subtitle_zh_cn_ass_path || '',
+          subtitle_en_md_path: item.subtitle_en_md_path || '',
+          subtitle_zh_cn_md_path: item.subtitle_zh_cn_md_path || '',
+          subtitle_en_with_words_json_path: item.subtitle_en_with_words_json_path || '',
+          files: item.files || {
+            video: '',
+            thumbnail: '',
+            wav: '',
+            subtitles: {
+              en_json: '',
+              zh_json: '',
+              en_ass: '',
+              zh_ass: '',
+              en_md: '',
+              zh_md: '',
+              en_with_words: ''
+            }
+          }
+        };
+      });
+      
+      console.log('处理后的数据:', processedData);
+      setVideoData(processedData);
+      setFilteredData(processedData);
+      
     } catch (error) {
       console.error('获取视频数据失败:', error);
       setError(error instanceof Error ? error.message : '未知错误');
+      
+      // 出错时使用模拟数据
+      const mockData: VideoData[] = Array.from({ length: 5 }, (_, i) => ({
+        id: i + 1,
+        title: `[模拟] 示例视频 ${i + 1}`,
+        url: 'https://example.com/mock-video',
+        hash_name: `mock-${i + 1}`,
+        folder_hash_name_path: '',
+        created_at: new Date().toISOString(),
+        status: 'pending',
+        file_path: '',
+        pic_thumb_path: '',
+        wav_path: '',
+        subtitle_en_json_path: '',
+        subtitle_zh_cn_json_path: '',
+        subtitle_en_ass_path: '',
+        subtitle_zh_cn_ass_path: '',
+        subtitle_en_md_path: '',
+        subtitle_zh_cn_md_path: '',
+        subtitle_en_with_words_json_path: '',
+        files: {
+          video: '',
+          thumbnail: '',
+          wav: '',
+          subtitles: {
+            en_json: '',
+            zh_json: '',
+            en_ass: '',
+            zh_ass: '',
+            en_md: '',
+            zh_md: '',
+            en_with_words: ''
+          }
+        }
+      }));
+      
+      setVideoData(mockData);
+      setFilteredData(mockData);
+      message.warning('后端服务不可用，显示模拟数据');
     } finally {
       setLoading(false);
     }
@@ -168,7 +337,7 @@ const VideoDataPage: React.FC = () => {
     setPreviewImage(null);
   };
 
-  const columns = [
+  const columns: ColumnType<VideoData>[] = [
     {
       title: 'ID',
       dataIndex: 'id',
@@ -180,69 +349,51 @@ const VideoDataPage: React.FC = () => {
       dataIndex: 'pic_thumb_path',
       key: 'pic_thumb_path',
       width: 120,
-      render: (text: string, record: VideoData) => {
-        // 使用专门的缩略图API
-        if (record.hash_name) {
-          // 尝试使用专门的API
-          const thumbnailUrl = `/api/video/${record.hash_name}/thumbnail`;
-          console.log('使用缩略图API:', thumbnailUrl);
-          
-          // 添加一个直接访问的按钮
-          return (
-            <div>
-              <div style={{ width: 80, height: 45, overflow: 'hidden', borderRadius: 4, marginBottom: 4 }}>
-                <img 
-                  src={thumbnailUrl} 
-                  alt={record.title} 
-                  style={{ 
-                    width: '100%', 
-                    height: '100%', 
-                    objectFit: 'cover',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => handlePreviewImage(thumbnailUrl, record.title || '视频缩略图')}
-                  onError={(e) => {
-                    // 图片加载失败时显示默认图片
-                    console.error('缩略图加载失败:', thumbnailUrl);
-                    const target = e.target as HTMLImageElement;
-                    target.onerror = null; // 防止无限循环
-                    target.src = '/static/assets/default-thumbnail.svg';
-                  }}
-                />
-              </div>
-              {record.folder_hash_name_path && (
-                <Button 
-                  type="link" 
-                  size="small" 
-                  onClick={() => {
-                    // 尝试直接访问缩略图
-                    const directPath = `/api/direct-file/${record.hash_name}/original/thumbnail.jpg`;
-                    window.open(directPath, '_blank');
-                  }}
-                  style={{ padding: 0, fontSize: 12 }}
-                >
-                  直接访问
-                </Button>
-              )}
-            </div>
-          );
+      render: (_: any, record: VideoData) => {
+        // 尝试多种可能的缩略图路径
+        let thumbnailUrl = '';
+        
+        // 1. 首先尝试使用pic_thumb_path
+        if (record.pic_thumb_path) {
+          if (record.pic_thumb_path.startsWith('http')) {
+            thumbnailUrl = record.pic_thumb_path;
+          } else if (record.pic_thumb_path.startsWith('/')) {
+            thumbnailUrl = `/api${record.pic_thumb_path}`;
+          } else {
+            thumbnailUrl = `/api/${record.pic_thumb_path}`;
+          }
+        }
+        // 2. 然后尝试使用hash_name
+        else if (record.hash_name) {
+          thumbnailUrl = `/api/video/${record.hash_name}/thumbnail`;
         }
         
+        console.log(`记录ID ${record.id} 的缩略图URL: ${thumbnailUrl}`);
+        
         return (
-          <div 
-            style={{ 
-              width: 80, 
-              height: 45, 
-              background: '#f0f0f0', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              borderRadius: 4,
-              color: '#999',
-              fontSize: 12
-            }}
-          >
-            <FileImageOutlined style={{ fontSize: 16 }} />
+          <div>
+            <div style={{ width: 80, height: 45, overflow: 'hidden', borderRadius: 4, marginBottom: 4 }}>
+              <img 
+                src={thumbnailUrl} 
+                alt={record.title} 
+                style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                onClick={() => handlePreviewImage(thumbnailUrl, record.title)}
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.onerror = null;
+                  console.error(`缩略图加载失败: ${thumbnailUrl}`);
+                  
+                  // 尝试备用路径
+                  if (!thumbnailUrl.includes('/thumbnail') && record.hash_name) {
+                    const backupUrl = `/api/video/${record.hash_name}/thumbnail`;
+                    console.log(`尝试备用URL: ${backupUrl}`);
+                    target.src = backupUrl;
+                  } else {
+                    target.src = '/static/assets/default-thumbnail.svg';
+                  }
+                }}
+              />
+            </div>
           </div>
         );
       },
@@ -254,322 +405,121 @@ const VideoDataPage: React.FC = () => {
       ellipsis: true,
     },
     {
-      title: 'URL',
+      title: '视频链接',
       dataIndex: 'url',
       key: 'url',
       ellipsis: true,
       render: (text: string) => (
         <Tooltip title={text}>
-          <a href={text} target="_blank" rel="noopener noreferrer">
-            {text}
-          </a>
+          <a href={text} target="_blank" rel="noopener noreferrer">{text}</a>
         </Tooltip>
       ),
     },
     {
-      title: 'Hash',
-      dataIndex: 'hash_name',
-      key: 'hash_name',
-      width: 200,
-      ellipsis: true,
-      render: (text: string) => (
-        <Tooltip title={text}>
-          <span>{text}</span>
-        </Tooltip>
-      ),
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (text: string) => {
+        const statusMap: Record<string, { color: string; text: string }> = {
+          pending: { color: 'orange', text: '处理中' },
+          completed: { color: 'green', text: '已完成' },
+          error: { color: 'red', text: '错误' },
+        };
+        const status = statusMap[text] || { color: 'default', text: text || '未知' };
+        return <Tag color={status.color}>{status.text}</Tag>;
+      },
+    },
+    {
+      title: '字幕文件',
+      key: 'subtitles',
+      width: 400,
+      render: (_: any, record: VideoData) => {
+        const getFileLink = (path: string | null | undefined, label: string, type?: string) => {
+          if (!path) return null;
+          return (
+            <Tooltip title={`下载${label}`}>
+              <a href={getFileUrl(path, type)} target="_blank" rel="noopener noreferrer">
+                <Button type="link" icon={<FileTextOutlined />} size="small">
+                  {label}
+                </Button>
+              </a>
+            </Tooltip>
+          );
+        };
+
+        return (
+          <Space wrap>
+            {getFileLink(record.hash_name, '英文JSON', 'en_json')}
+            {getFileLink(record.hash_name, '中文JSON', 'zh_json')}
+            {getFileLink(record.hash_name, '双语字幕', 'bilingual_ass')}
+            {getFileLink(record.hash_name, '单词时间戳', 'whisperx')}
+          </Space>
+        );
+      },
+    },
+    {
+      title: '音频',
+      key: 'audio',
+      width: 100,
+      render: (_: any, record: VideoData) => {
+        if (!record.hash_name) return '-';
+        return (
+          <Tooltip title="下载音频文件">
+            <a href={getFileUrl(record.hash_name, 'wav')} target="_blank" rel="noopener noreferrer">
+              <Button type="link" icon={<FileTextOutlined />} size="small">
+                WAV
+              </Button>
+            </a>
+          </Tooltip>
+        );
+      },
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
       width: 180,
-      render: (text: string) => text ? new Date(text).toLocaleString('zh-CN') : '-',
+      render: (text: string) => new Date(text).toLocaleString(),
     },
     {
-      title: '文件路径',
-      dataIndex: 'file_path',
-      key: 'file_path',
-      width: 120,
-      ellipsis: true,
-      render: (text: string) => {
-        if (!text) return '-';
-        
-        // 构建文件URL
-        const fileUrl = getFileUrl(text);
-        
-        return (
-          <Tooltip title={text}>
-            <Button 
-              type="link" 
-              size="small" 
-              onClick={() => window.open(fileUrl, '_blank')}
-              style={{ padding: 0 }}
-            >
-              查看文件
-            </Button>
-          </Tooltip>
-        );
-      }
-    },
-    {
-      title: '字幕文件',
-      key: 'subtitles',
-      width: 200,
-      render: (_: any, record: VideoData) => {
-        // 检查files.subtitles结构
-        const subtitles = record.files?.subtitles;
-        
-        if (!subtitles) {
-          // 兼容旧结构
-          const enSubtitle = record.subtitle_en_json_path || record.subtitle_en_ass_path;
-          const zhSubtitle = record.subtitle_zh_cn_json_path || record.subtitle_zh_cn_ass_path;
-          
-          if (!enSubtitle && !zhSubtitle) return '-';
-          
-          return (
-            <Space size="small" wrap>
-              {record.subtitle_en_json_path && (
-                <Tooltip title="WhisperX 原始转写">
-                  <Button 
-                    type="link" 
-                    size="small" 
-                    onClick={() => window.open(getFileUrl(record.subtitle_en_json_path), '_blank')}
-                    style={{ padding: 0, fontWeight: 'bold', color: '#1890ff' }}
-                  >
-                    WhisperX转写
-                  </Button>
-                </Tooltip>
-              )}
-              {enSubtitle && (
-                <Tooltip title="英文字幕">
-                  <Button 
-                    type="link" 
-                    size="small" 
-                    onClick={() => window.open(getFileUrl(enSubtitle), '_blank')}
-                    style={{ padding: 0 }}
-                  >
-                    EN
-                  </Button>
-                </Tooltip>
-              )}
-              {zhSubtitle && (
-                <Tooltip title="中文字幕">
-                  <Button 
-                    type="link" 
-                    size="small" 
-                    onClick={() => window.open(getFileUrl(zhSubtitle), '_blank')}
-                    style={{ padding: 0 }}
-                  >
-                    中文
-                  </Button>
-                </Tooltip>
-              )}
-            </Space>
-          );
-        }
-        
-        // 新结构 - 使用files.subtitles
-        return (
-          <Space size="small" wrap>
-            {subtitles.en_json && (
-              <Tooltip title="WhisperX 原始转写">
-                <Button 
-                  type="link" 
-                  size="small" 
-                  onClick={() => window.open(getFileUrl(subtitles.en_json), '_blank')}
-                  style={{ padding: 0, fontWeight: 'bold', color: '#1890ff' }}
-                >
-                  WhisperX转写
-                </Button>
-              </Tooltip>
-            )}
-            {subtitles.en_json && (
-              <Tooltip title="英文JSON字幕">
-                <Button 
-                  type="link" 
-                  size="small" 
-                  onClick={() => window.open(getFileUrl(subtitles.en_json), '_blank')}
-                  style={{ padding: 0 }}
-                >
-                  EN-JSON
-                </Button>
-              </Tooltip>
-            )}
-            {subtitles.zh_json && (
-              <Tooltip title="中文JSON字幕">
-                <Button 
-                  type="link" 
-                  size="small" 
-                  onClick={() => window.open(getFileUrl(subtitles.zh_json), '_blank')}
-                  style={{ padding: 0 }}
-                >
-                  中文-JSON
-                </Button>
-              </Tooltip>
-            )}
-            {subtitles.en_ass && (
-              <Tooltip title="英文ASS字幕">
-                <Button 
-                  type="link" 
-                  size="small" 
-                  onClick={() => window.open(getFileUrl(subtitles.en_ass), '_blank')}
-                  style={{ padding: 0 }}
-                >
-                  EN-ASS
-                </Button>
-              </Tooltip>
-            )}
-            {subtitles.zh_ass && (
-              <Tooltip title="中文ASS字幕">
-                <Button 
-                  type="link" 
-                  size="small" 
-                  onClick={() => window.open(getFileUrl(subtitles.zh_ass), '_blank')}
-                  style={{ padding: 0 }}
-                >
-                  中文-ASS
-                </Button>
-              </Tooltip>
-            )}
-            {subtitles.ass && (
-              <Tooltip title="双语ASS字幕">
-                <Button 
-                  type="link" 
-                  size="small" 
-                  onClick={() => window.open(getFileUrl(subtitles.ass), '_blank')}
-                  style={{ padding: 0 }}
-                >
-                  双语-ASS
-                </Button>
-              </Tooltip>
-            )}
-          </Space>
-        );
-      }
-    },
-    {
-      title: '文档',
-      key: 'docs',
-      width: 150,
-      render: (_: any, record: VideoData) => {
-        // 检查files.subtitles结构中的文档
-        const subtitles = record.files?.subtitles;
-        
-        if (!subtitles) {
-          return '-';
-        }
-        
-        return (
-          <Space size="small" wrap>
-            {subtitles.en_md && (
-              <Tooltip title="英文文档">
-                <Button 
-                  type="link" 
-                  size="small" 
-                  onClick={() => window.open(getFileUrl(subtitles.en_md), '_blank')}
-                  style={{ padding: 0 }}
-                >
-                  EN-MD
-                </Button>
-              </Tooltip>
-            )}
-            {subtitles.zh_md && (
-              <Tooltip title="中文文档">
-                <Button 
-                  type="link" 
-                  size="small" 
-                  onClick={() => window.open(getFileUrl(subtitles.zh_md), '_blank')}
-                  style={{ padding: 0 }}
-                >
-                  中文-MD
-                </Button>
-              </Tooltip>
-            )}
-          </Space>
-        );
-      }
-    },
-    {
-      title: '原始转写',
-      key: 'original_transcript',
-      width: 100,
-      render: (_: any, record: VideoData) => {
-        if (!hasOriginalTranscript(record)) {
-          return '-';
-        }
-        
-        // 确定原始转写文件的路径
-        let transcriptPath = '';
-        if (record.files?.subtitles?.en_json) {
-          transcriptPath = record.files.subtitles.en_json;
-        } else if (record.subtitle_en_json_path) {
-          transcriptPath = record.subtitle_en_json_path;
-        }
-        
-        return (
-          <Space size="small">
-            {transcriptPath && (
-              <Tooltip title="查看文件">
-                <Button 
-                  type="link" 
-                  size="small" 
-                  onClick={() => window.open(getFileUrl(transcriptPath), '_blank')}
-                  style={{ padding: 0 }}
-                >
-                  查看文件
-                </Button>
-              </Tooltip>
-            )}
-            <Tooltip title="API访问">
-              <Button 
-                type="link" 
-                size="small" 
-                onClick={() => handleViewOriginalTranscript(record.hash_name)}
-                style={{ padding: 0 }}
-              >
-                API访问
-              </Button>
-            </Tooltip>
-          </Space>
-        );
-      }
+      title: '最后同步',
+      dataIndex: 'last_synced_at',
+      key: 'last_synced_at',
+      width: 180,
+      render: (text: string) => text ? new Date(text).toLocaleString() : '-',
     },
     {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 200,
+      fixed: 'right' as const,
       render: (_: any, record: VideoData) => (
-        <Space size="small">
+        <Space>
           <Tooltip title="查看详情">
-            <Button 
-              type="text" 
-              icon={<EyeOutlined />} 
+            <Button
+              type="link"
+              icon={<EyeOutlined />}
               onClick={() => handleViewDetails(record.hash_name)}
-              size="small"
             />
           </Tooltip>
-          {hasOriginalTranscript(record) && (
-            <Tooltip title="查看原始转写">
-              <Button
-                type="text"
-                icon={<FileTextOutlined />}
-                onClick={() => handleViewOriginalTranscript(record.hash_name)}
-                size="small"
-              />
-            </Tooltip>
-          )}
+          <Tooltip title="查看原始转写">
+            <Button
+              type="link"
+              icon={<FileTextOutlined />}
+              onClick={() => handleViewOriginalTranscript(record.hash_name)}
+              disabled={!hasOriginalTranscript(record)}
+            />
+          </Tooltip>
           <Popconfirm
             title="确定要删除这个视频吗？"
             onConfirm={() => handleDelete(record.hash_name)}
             okText="确定"
             cancelText="取消"
           >
-            <Button 
-              type="text" 
-              danger 
-              icon={<DeleteOutlined />} 
-              size="small"
-            />
+            <Tooltip title="删除">
+              <Button type="link" danger icon={<DeleteOutlined />} />
+            </Tooltip>
           </Popconfirm>
         </Space>
       ),
@@ -601,6 +551,34 @@ const VideoDataPage: React.FC = () => {
           >
             刷新数据
           </Button>
+          <Button
+            onClick={async () => {
+              try {
+                const result = await checkDatabaseConsistency();
+                if (result.is_consistent) {
+                  message.success('数据库与本地文件一致');
+                } else {
+                  Modal.warning({
+                    title: '数据库与本地文件不一致',
+                    content: (
+                      <div>
+                        <p>发现以下不一致:</p>
+                        <p>数据库中有 {result.db_videos_count} 条记录</p>
+                        <p>本地文件夹有 {result.hash_folders_count} 个</p>
+                        <p>数据库中有但本地没有: {result.inconsistencies.db_entries_without_folder.length} 个</p>
+                        <p>本地有但数据库中没有: {result.inconsistencies.folders_not_in_db.length} 个</p>
+                      </div>
+                    ),
+                  });
+                }
+              } catch (error) {
+                message.error('检查数据库一致性失败');
+              }
+            }}
+            icon={<DatabaseOutlined />}
+          >
+            检查数据库一致性
+          </Button>
         </Space>
       </Card>
 
@@ -628,7 +606,7 @@ const VideoDataPage: React.FC = () => {
             </div>
           </div>
           <Table
-            dataSource={filteredData}
+            dataSource={Array.isArray(filteredData) ? filteredData : []}
             columns={columns}
             rowKey="id"
             pagination={{ 
