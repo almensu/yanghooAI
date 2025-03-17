@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Row, Col, Alert, Spin, message, Input, Button, Badge, Tooltip, Divider, Card, Statistic } from 'antd';
+import { Typography, Row, Col, Alert, Spin, message, Input, Button, Badge, Tooltip, Divider, Card } from 'antd';
 import { ReloadOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import VideoCard from '@/components/VideoCard';
 import { getVideos, deleteVideo, addVideo, VideoDisplay, getVideoDataForHome, getVideosCount } from '@/services/video';
@@ -7,31 +7,6 @@ import styles from './index.less';
 
 const { Title } = Typography;
 const { Search } = Input;
-
-const HeaderInfo: React.FC<{ totalVideos: number; dbMismatch: boolean; videos: VideoDisplay[] }> = ({
-  totalVideos,
-  dbMismatch,
-  videos,
-}) => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-    <div>
-      <Statistic title="视频总数" value={totalVideos} />
-      <Statistic 
-        title="已加载" 
-        value={videos.length} 
-        style={{ marginLeft: 32 }}
-      />
-    </div>
-    {dbMismatch && (
-      <Alert
-        type="warning"
-        message={`数据库中有 ${totalVideos} 个视频，但只显示了 ${videos.length} 个`}
-        showIcon
-        icon={<InfoCircleOutlined />}
-      />
-    )}
-  </div>
-);
 
 const HomePage: React.FC = () => {
   const [videos, setVideos] = useState<VideoDisplay[]>([]);
@@ -182,7 +157,19 @@ const HomePage: React.FC = () => {
 
       <Divider />
 
-      <HeaderInfo totalVideos={totalVideos} dbMismatch={dbMismatch} videos={videos} />
+      {/* 删除 HeaderInfo 组件的调用 */}
+      {/* <HeaderInfo totalVideos={totalVideos} dbMismatch={dbMismatch} videos={videos} /> */}
+      
+      {/* 仅在数据库不匹配时显示警告 */}
+      {dbMismatch && (
+        <Alert
+          type="warning"
+          message={`数据库中有 ${totalVideos} 个视频，但只显示了 ${videos.length} 个`}
+          showIcon
+          icon={<InfoCircleOutlined />}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       
       <div className={styles.videoGrid}>
         {loading ? (
